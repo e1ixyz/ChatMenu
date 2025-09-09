@@ -259,11 +259,13 @@ public class ChatMenu extends JavaPlugin {
                         encoded.add(cmd);
                     }
 
-                    String lastName = (cfg.type == CommandType.TARGET)
-                            ? (targetName == null ? viewer.getName() : targetName)
-                            : viewer.getName();
+                    String viewerName = viewer.getName();
+                    String targetResolved = (cfg.type == CommandType.TARGET)
+                            ? (targetName == null ? viewerName : targetName)
+                            : viewerName;
 
-                    String cmrun = "/cmrun " + String.join(";", encoded) + " " + lastName;
+                    // NEW: pass BOTH viewer and target to cmrun (back-compat kept in CommandRunner)
+                    String cmrun = "/cmrun " + String.join(";", encoded) + " " + viewerName + " " + targetResolved;
 
                     Component clickable = displayComp
                             .hoverEvent(HoverEvent.showText(hoverComp))
@@ -271,7 +273,7 @@ public class ChatMenu extends JavaPlugin {
 
                     full = full.append(clickable).append(Component.text(" "));
                 } else {
-                    // No pipes -> treat as plain text "[...]"
+                    // No pipes -> plain "[...]" text
                     full = full.append(parseText(restoreBrackets("[" + segment + "]"), viewer, targetName));
                 }
 

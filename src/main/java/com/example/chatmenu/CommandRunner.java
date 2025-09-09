@@ -9,22 +9,43 @@ import org.bukkit.entity.Player;
 public class CommandRunner implements CommandExecutor {
 
     /**
-     * Usage (internal): /cmrun <cmd1;cmd2;...> <targetOrSelfName>
-     * - Per-command executor:
-     *     "player:/coords" runs as that player
-     *     "console:lp user %player% ..." runs as console (default)
-     * - Placeholders %player% and %target% are replaced with the provided last argument.
-     * - Leading "/" is optional and will be stripped when dispatching.
+     * Internal:
+     *   NEW format: /cmrun <cmd1;cmd2;...> <viewerName> <targetName>
+     *   Legacy     : /cmrun <cmd1;cmd2;...> <name>           (both map to <name>)
+     *
+     * Per-command executor prefixes:
+     *   player:/coords      -> run as the clicking player (viewer)
+     *   console:/lp user ... -> run as console (default if no prefix)
+     *
+     * Placeholder replacement in each command before dispatch:
+     *   %player% -> viewerName
+     *   %target% -> targetName
+     *
+     * Leading "/" is optional for commands.
      */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length < 2) return false;
 
-        String target = args[args.length - 1];
+        final String viewerName;
+        final String targetName;
 
-        // Rebuild the joined command string from all but the last arg
+        int tailCount;
+        if (args.length >= 3) {
+            // NEW format: last two are viewer + target
+            viewerName = args[args.length - 2];
+            targetName = args[args.length - 1];
+            tailCount = 2;
+        } else {
+            // Legacy format: last one used for both
+            viewerName = args[args.length - 1];
+            targetName = args[args.length - 1];
+            tailCount = 1;
+        }
+
+        // Rebuild command string from the remaining args
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < args.length - 1; i++) {
+        for (int i = 0; i < args.length - tailCount; i++) {
             if (i > 0) sb.append(" ");
             sb.append(args[i]);
         }
@@ -44,19 +65,19 @@ public class CommandRunner implements CommandExecutor {
                 seg = seg.substring(8).trim();
             }
 
-            // Replace placeholders with the provided name (for both SELF and TARGET flows)
-            String cmdFinal = seg.replace("%player%", target).replace("%target%", target);
+            String cmdFinal = seg
+                    .replace("%player%", viewerName)
+                    .replace("%target%", targetName);
 
-            // Trim optional leading slash
             if (cmdFinal.startsWith("/")) cmdFinal = cmdFinal.substring(1);
 
             final String toExec = cmdFinal;
-            final long delay = i * 2L; // small spacing between commands
+            final long delay = i * 2L;
 
             if (runAsPlayer) {
-                Player p = Bukkit.getPlayerExact(target);
+                Player p = Bukkit.getPlayerExact(viewerName);
                 if (p == null || !p.isOnline()) {
-                    sender.sendMessage("§cCannot run as player: " + target + " is not online.");
+                    sender.sendMessage("§cCannot run as player: " + viewerName + " is not online.");
                     continue;
                 }
                 Bukkit.getScheduler().runTaskLater(ChatMenu.getInstance(),
@@ -68,5 +89,5 @@ public class CommandRunner implements CommandExecutor {
         }
 
         return true;
-    }
+        }
 }
