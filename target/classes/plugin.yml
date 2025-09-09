@@ -1,0 +1,21 @@
+name: ChatMenu
+main: com.example.chatmenu.ChatMenu
+version: 2.0.0
+api-version: 1.21
+
+commands:
+  chatmenu:
+    description: ChatMenu admin commands
+    usage: /chatmenu reload
+    permission: chatmenu.admin
+  cmrun:
+    description: Internal command runner (used by ChatMenu clickable items)
+    usage: /cmrun <command...> <player>
+
+permissions:
+  chatmenu.admin:
+    default: op
+  chatmenu.prefix:
+    default: true
+  chatmenu.punish:
+    default: op

@@ -1,0 +1,29 @@
+# Any child under "commands" becomes a dynamic command registered at runtime.
+# Fields:
+#   permission: required node to open the menu
+#   type: self | target  (self = acts on viewer; target = requires /<cmd> <player>)
+#   message: list of lines; clickable segments are [Display | command1; command2 | Hover]
+# Placeholders:
+#   %player% -> the viewer's name (for self menus this equals the affected player)
+#   %target% -> the target name (only meaningful for type: target)
+
+commands:
+
+  prefix:
+    permission: chatmenu.prefix
+    type: self
+    message:
+      - "&fPick your Name Color and Prefix:"
+      - "&fColor: [&2Dark Green|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &2|Select Dark Green], [&aGreen|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &a|Select Green], [&eYellow|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &e|Select Yellow], [&6Orange|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &6|Select Orange], [&cRed|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &c|Select Red], [&9Blue|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &9|Select Blue], [&5Purple|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &5|Select Purple]"
+      - "&fPrefix: [&d✿|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&d✿ &r\"|Bloom with this symbol], [&c❤|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&c❤ &r\"|Show your love], [&f♬|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&f♬ &r\"|Musical vibes], [&e✦|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&e✦ &r\"|Shine bright], [&6✯|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&6✯ &r\"|Add sparkle], [&9☄|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&9☄ &r\"|Cosmic style], [&a☀|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&a☀ &r\"|Sunny mood]"
+      - " &c[Reset Color and Prefix|lp user %player% meta removeprefix 2; lp user %player% meta removeprefix 3|Remove all selections]"
+
+  punish:
+    permission: chatmenu.punish
+    type: target
+    message:
+      - "&cPunish Menu"
+      - "&7Targeting: &f%target%"
+      - "[&eWarn|warn %target%|Send a warning]"
+      - "[&6Mute|mute %target%|Mute player]"
+      - "[&cBan|ban %target%|Ban player]"
