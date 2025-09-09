@@ -25,7 +25,7 @@ public class ChatMenu extends JavaPlugin {
     private final Map<String, CommandConfig> commands = new HashMap<>();
     private final Set<String> dynamicCommands = new HashSet<>();
 
-    // Sentinels for escaped bracket handling
+    // Sentinels for escaped bracket handling (\[ and \])
     private static final String LBR_SENTINEL = "\uE000";
     private static final String RBR_SENTINEL = "\uE001";
 
@@ -75,7 +75,7 @@ public class ChatMenu extends JavaPlugin {
             var sec = root.getConfigurationSection(key);
             if (sec == null) continue;
 
-            String permission = sec.getString("permission", "").trim();
+            String permission = Optional.ofNullable(sec.getString("permission", "")).orElse("").trim();
             String typeStr = sec.getString("type", "self");
             CommandType type = CommandType.fromString(typeStr);
 
@@ -177,7 +177,7 @@ public class ChatMenu extends JavaPlugin {
         }
 
         if (cfg.type == CommandType.SELF) {
-            sendChatMenu(viewer, null, cfg); // self-target (null target string)
+            sendChatMenu(viewer, null, cfg);
             return true;
         }
 
@@ -197,9 +197,8 @@ public class ChatMenu extends JavaPlugin {
     // Replace escaped brackets with sentinels so the parser can ignore them as markers.
     private String preprocessBrackets(String s) {
         if (s == null || s.isEmpty()) return s;
-        // First handle backslash escapes, then double-bracket sugar
+        // Only backslash escapes (no [[ ]] sugar)
         s = s.replace("\\[", LBR_SENTINEL).replace("\\]", RBR_SENTINEL);
-        s = s.replace("[[", LBR_SENTINEL).replace("]]", RBR_SENTINEL);
         return s;
     }
 
@@ -207,6 +206,12 @@ public class ChatMenu extends JavaPlugin {
     private String restoreBrackets(String s) {
         if (s == null || s.isEmpty()) return s;
         return s.replace(LBR_SENTINEL, "[").replace(RBR_SENTINEL, "]");
+    }
+
+    private boolean flagsDefaultAsPlayer(String rawFlags) {
+        if (rawFlags == null) return false;
+        String f = rawFlags.toLowerCase(Locale.ROOT).replace(" ", "");
+        return f.contains("as=player") || f.contains("runas=player") || f.equals("player");
     }
 
     private void sendChatMenu(Player viewer, String targetName, CommandConfig cfg) {
@@ -225,22 +230,40 @@ public class ChatMenu extends JavaPlugin {
                 }
 
                 String segment = working.substring(idx + 1, end);
-                int sep1 = segment.indexOf("|");
-                int sep2 = segment.lastIndexOf("|");
+                // Allow optional 4th part for flags: [display | commands | hover | flags]
+                String[] parts = segment.split("\\|", 4);
 
-                if (sep1 != -1 && sep2 != -1 && sep1 != sep2) {
-                    String displayRaw = restoreBrackets(segment.substring(0, sep1).trim());
-                    String commandsRaw = restoreBrackets(segment.substring(sep1 + 1, sep2).trim());
-                    String hoverRaw   = restoreBrackets(segment.substring(sep2 + 1).trim());
+                if (parts.length >= 3) {
+                    String displayRaw = restoreBrackets(parts[0].trim());
+                    String commandsRaw = restoreBrackets(parts[1].trim());
+                    String hoverRaw   = restoreBrackets(parts[2].trim());
+                    String flagsRaw   = parts.length >= 4 ? restoreBrackets(parts[3].trim()) : "";
+
+                    boolean defaultAsPlayer = flagsDefaultAsPlayer(flagsRaw);
 
                     Component displayComp = parseText(displayRaw, viewer, targetName);
                     Component hoverComp   = parseText(hoverRaw, viewer, targetName);
 
                     String[] cmds = commandsRaw.split("\\s*;\\s*");
-                    String cmrun = "/cmrun " + String.join(";", cmds) + " " +
-                                   (cfg.type == CommandType.TARGET
-                                           ? (targetName == null ? viewer.getName() : targetName)
-                                           : viewer.getName());
+                    List<String> encoded = new ArrayList<>(cmds.length);
+                    for (String c : cmds) {
+                        String cmd = c.trim();
+                        if (cmd.isEmpty()) continue;
+
+                        // Apply default executor if caller didn't specify one per command
+                        boolean hasPrefix = cmd.regionMatches(true, 0, "player:", 0, 7)
+                                || cmd.regionMatches(true, 0, "console:", 0, 8);
+                        if (defaultAsPlayer && !hasPrefix) {
+                            cmd = "player:" + cmd;
+                        }
+                        encoded.add(cmd);
+                    }
+
+                    String lastName = (cfg.type == CommandType.TARGET)
+                            ? (targetName == null ? viewer.getName() : targetName)
+                            : viewer.getName();
+
+                    String cmrun = "/cmrun " + String.join(";", encoded) + " " + lastName;
 
                     Component clickable = displayComp
                             .hoverEvent(HoverEvent.showText(hoverComp))
@@ -248,7 +271,7 @@ public class ChatMenu extends JavaPlugin {
 
                     full = full.append(clickable).append(Component.text(" "));
                 } else {
-                    // No pipes -> treat it as plain text "[...]" (after restore)
+                    // No pipes -> treat as plain text "[...]"
                     full = full.append(parseText(restoreBrackets("[" + segment + "]"), viewer, targetName));
                 }
 
