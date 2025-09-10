@@ -1,5 +1,7 @@
 com/example/chatmenu/DynamicMenuCommand.class
 com/example/chatmenu/CommandRunner.class
+com/example/chatmenu/ChatMenu$LineCtx.class
 com/example/chatmenu/CommandType.class
 com/example/chatmenu/ChatMenu.class
 com/example/chatmenu/CommandConfig.class
+com/example/chatmenu/ChatMenu$PapiContext.class

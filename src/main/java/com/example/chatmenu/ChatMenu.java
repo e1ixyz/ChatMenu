@@ -7,6 +7,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
@@ -28,6 +29,9 @@ public class ChatMenu extends JavaPlugin {
     // Sentinels for escaped bracket handling (\[ and \])
     private static final String LBR_SENTINEL = "\uE000";
     private static final String RBR_SENTINEL = "\uE001";
+
+    // PlaceholderAPI context selector
+    private enum PapiContext { VIEWER, TARGET }
 
     public static ChatMenu getInstance() {
         return instance;
@@ -214,9 +218,47 @@ public class ChatMenu extends JavaPlugin {
         return f.contains("as=player") || f.contains("runas=player") || f.equals("player");
     }
 
+    private PapiContext flagsPapiContext(String rawFlags, PapiContext fallback) {
+        if (rawFlags == null) return fallback;
+        String f = rawFlags.toLowerCase(Locale.ROOT);
+        if (f.contains("ctx=target")) return PapiContext.TARGET;
+        if (f.contains("ctx=viewer")) return PapiContext.VIEWER;
+        return fallback;
+    }
+
+    // Detect and strip an optional per-line context directive: {{ctx=viewer}} or {{ctx=target}}
+    private static class LineCtx {
+        final String text;
+        final PapiContext ctx;
+        LineCtx(String text, PapiContext ctx) { this.text = text; this.ctx = ctx; }
+    }
+    private LineCtx extractLineContext(String raw) {
+        if (raw == null) return new LineCtx("", PapiContext.VIEWER);
+        String s = raw;
+        PapiContext ctx = PapiContext.VIEWER;
+        // Lightweight prefix directive, case-insensitive, optional whitespace after
+        // Examples: "{{ctx=target}} ..." or "{{CTX=VIEWER}}"
+        if (s.startsWith("{{") && s.toLowerCase(Locale.ROOT).startsWith("{{ctx=")) {
+            int end = s.indexOf("}}");
+            if (end > 0) {
+                String inside = s.substring(2, end).trim(); // ctx=target
+                String[] kv = inside.split("=", 2);
+                if (kv.length == 2) {
+                    if (kv[1].equalsIgnoreCase("target")) ctx = PapiContext.TARGET;
+                    if (kv[1].equalsIgnoreCase("viewer")) ctx = PapiContext.VIEWER;
+                }
+                s = s.substring(end + 2).trim();
+            }
+        }
+        return new LineCtx(s, ctx);
+    }
+
     private void sendChatMenu(Player viewer, String targetName, CommandConfig cfg) {
         for (String rawLine : cfg.message) {
-            String working = preprocessBrackets(rawLine);
+            LineCtx lc = extractLineContext(rawLine);
+            String working = preprocessBrackets(lc.text);
+            PapiContext lineCtx = lc.ctx;
+
             Component full = Component.empty();
 
             int idx = 0;
@@ -226,7 +268,7 @@ public class ChatMenu extends JavaPlugin {
 
                 String beforeRaw = working.substring(0, idx);
                 if (!beforeRaw.isEmpty()) {
-                    full = full.append(parseText(restoreBrackets(beforeRaw), viewer, targetName));
+                    full = full.append(parseText(restoreBrackets(beforeRaw), viewer, targetName, lineCtx));
                 }
 
                 String segment = working.substring(idx + 1, end);
@@ -240,9 +282,10 @@ public class ChatMenu extends JavaPlugin {
                     String flagsRaw   = parts.length >= 4 ? restoreBrackets(parts[3].trim()) : "";
 
                     boolean defaultAsPlayer = flagsDefaultAsPlayer(flagsRaw);
+                    PapiContext btnCtx = flagsPapiContext(flagsRaw, lineCtx);
 
-                    Component displayComp = parseText(displayRaw, viewer, targetName);
-                    Component hoverComp   = parseText(hoverRaw, viewer, targetName);
+                    Component displayComp = parseText(displayRaw, viewer, targetName, btnCtx);
+                    Component hoverComp   = parseText(hoverRaw, viewer, targetName, btnCtx);
 
                     String[] cmds = commandsRaw.split("\\s*;\\s*");
                     List<String> encoded = new ArrayList<>(cmds.length);
@@ -264,7 +307,7 @@ public class ChatMenu extends JavaPlugin {
                             ? (targetName == null ? viewerName : targetName)
                             : viewerName;
 
-                    // NEW: pass BOTH viewer and target to cmrun (back-compat kept in CommandRunner)
+                    // Pass BOTH viewer and target to cmrun
                     String cmrun = "/cmrun " + String.join(";", encoded) + " " + viewerName + " " + targetResolved;
 
                     Component clickable = displayComp
@@ -274,7 +317,7 @@ public class ChatMenu extends JavaPlugin {
                     full = full.append(clickable).append(Component.text(" "));
                 } else {
                     // No pipes -> plain "[...]" text
-                    full = full.append(parseText(restoreBrackets("[" + segment + "]"), viewer, targetName));
+                    full = full.append(parseText(restoreBrackets("[" + segment + "]"), viewer, targetName, lineCtx));
                 }
 
                 working = working.substring(end + 1);
@@ -282,21 +325,34 @@ public class ChatMenu extends JavaPlugin {
             }
 
             if (!working.isEmpty()) {
-                full = full.append(parseText(restoreBrackets(working), viewer, targetName));
+                full = full.append(parseText(restoreBrackets(working), viewer, targetName, lineCtx));
             }
 
             viewer.sendMessage(full);
         }
     }
 
-    private Component parseText(String raw, Player viewer, String targetName) {
+    private Component parseText(String raw, Player viewer, String targetName, PapiContext ctx) {
         if (raw == null || raw.isEmpty()) return Component.empty();
 
         String s = raw.replace("%player%", viewer.getName());
         if (targetName != null) s = s.replace("%target%", targetName);
 
         try {
-            s = PlaceholderAPI.setPlaceholders(viewer, s);
+            if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+                if (ctx == PapiContext.TARGET && targetName != null) {
+                    Player targetOnline = Bukkit.getPlayerExact(targetName);
+                    if (targetOnline != null) {
+                        s = PlaceholderAPI.setPlaceholders(targetOnline, s);
+                    } else {
+                        // Fallback: many expansions require a Player; if target offline, use viewer to avoid nulls
+                        // (If you need true offline parsing, we can add OfflinePlayer support explicitly.)
+                        s = PlaceholderAPI.setPlaceholders(viewer, s);
+                    }
+                } else {
+                    s = PlaceholderAPI.setPlaceholders(viewer, s);
+                }
+            }
         } catch (Throwable ignored) { }
 
         if (s.contains("&")) {
