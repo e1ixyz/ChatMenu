@@ -236,8 +236,6 @@ public class ChatMenu extends JavaPlugin {
         if (raw == null) return new LineCtx("", PapiContext.VIEWER);
         String s = raw;
         PapiContext ctx = PapiContext.VIEWER;
-        // Lightweight prefix directive, case-insensitive, optional whitespace after
-        // Examples: "{{ctx=target}} ..." or "{{CTX=VIEWER}}"
         if (s.startsWith("{{") && s.toLowerCase(Locale.ROOT).startsWith("{{ctx=")) {
             int end = s.indexOf("}}");
             if (end > 0) {
@@ -272,7 +270,7 @@ public class ChatMenu extends JavaPlugin {
                 }
 
                 String segment = working.substring(idx + 1, end);
-                // Allow optional 4th part for flags: [display | commands | hover | flags]
+                // Optional 4th part for flags: [display | commands | hover | flags]
                 String[] parts = segment.split("\\|", 4);
 
                 if (parts.length >= 3) {
@@ -293,7 +291,6 @@ public class ChatMenu extends JavaPlugin {
                         String cmd = c.trim();
                         if (cmd.isEmpty()) continue;
 
-                        // Apply default executor if caller didn't specify one per command
                         boolean hasPrefix = cmd.regionMatches(true, 0, "player:", 0, 7)
                                 || cmd.regionMatches(true, 0, "console:", 0, 8);
                         if (defaultAsPlayer && !hasPrefix) {
@@ -307,7 +304,7 @@ public class ChatMenu extends JavaPlugin {
                             ? (targetName == null ? viewerName : targetName)
                             : viewerName;
 
-                    // Pass BOTH viewer and target to cmrun
+                    // Pass BOTH viewer and target to cmrun (new protocol)
                     String cmrun = "/cmrun " + String.join(";", encoded) + " " + viewerName + " " + targetResolved;
 
                     Component clickable = displayComp
@@ -332,6 +329,30 @@ public class ChatMenu extends JavaPlugin {
         }
     }
 
+    /* ---------- PlaceholderAPI context handling with Offline fallback ---------- */
+
+    private OfflinePlayer resolvePapiPlayer(String name) {
+        if (name == null || name.isEmpty()) return null;
+
+        // Try exact online first
+        Player exact = Bukkit.getPlayerExact(name);
+        if (exact != null) return exact;
+
+        // Try case-insensitive online
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (p.getName().equalsIgnoreCase(name)) return p;
+        }
+
+        // Try cached offline (if available on current server API)
+        try {
+            OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(name);
+            if (cached != null) return cached;
+        } catch (NoSuchMethodError ignored) { }
+
+        // Fallback to full offline lookup (may create an OfflinePlayer shell)
+        return Bukkit.getOfflinePlayer(name);
+    }
+
     private Component parseText(String raw, Player viewer, String targetName, PapiContext ctx) {
         if (raw == null || raw.isEmpty()) return Component.empty();
 
@@ -341,12 +362,11 @@ public class ChatMenu extends JavaPlugin {
         try {
             if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
                 if (ctx == PapiContext.TARGET && targetName != null) {
-                    Player targetOnline = Bukkit.getPlayerExact(targetName);
-                    if (targetOnline != null) {
-                        s = PlaceholderAPI.setPlaceholders(targetOnline, s);
+                    OfflinePlayer ctxPlayer = resolvePapiPlayer(targetName);
+                    if (ctxPlayer != null) {
+                        s = PlaceholderAPI.setPlaceholders(ctxPlayer, s);
                     } else {
-                        // Fallback: many expansions require a Player; if target offline, use viewer to avoid nulls
-                        // (If you need true offline parsing, we can add OfflinePlayer support explicitly.)
+                        // Fallback to viewer to avoid nulls
                         s = PlaceholderAPI.setPlaceholders(viewer, s);
                     }
                 } else {
