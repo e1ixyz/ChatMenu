@@ -1,11 +1,16 @@
 # Any child under "commands" becomes a dynamic command registered at runtime.
-# Fields:
-#   permission: required node to open the menu
-#   type: self | target  (self = acts on viewer; target = requires /<cmd> <player>)
-#   message: list of lines; clickable segments are [Display | command1; command2 | Hover]
+# message: accepts either strings (legacy [Display|Commands|Hover] syntax) or structured
+#          segments built from "text" and "button" entries.
+# Button fields:
+#   text        -> label shown in chat
+#   hover       -> tooltip (string or list of strings)
+#   commands    -> string or list (supports ; to chain actions)
+#   run-as      -> player | console  (defaults to console)
+#   context     -> viewer | target   (PlaceholderAPI render context)
+#   append-space -> add a trailing space after the button (default false)
 # Placeholders:
-#   %player% -> the viewer's name (for self menus this equals the affected player)
-#   %target% -> the target name (only meaningful for type: target)
+#   %player% -> viewer name
+#   %target% -> selected target (self menus fall back to the viewer)
 
 commands:
 
@@ -13,17 +18,154 @@ commands:
     permission: chatmenu.prefix
     type: self
     message:
-      - "&fPick your Name Color and Prefix:"
-      - "&fColor: [&2Dark Green|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &2|Select Dark Green], [&aGreen|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &a|Select Green], [&eYellow|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &e|Select Yellow], [&6Orange|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &6|Select Orange], [&cRed|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &c|Select Red], [&9Blue|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &9|Select Blue], [&5Purple|lp user %player% meta removeprefix 2; lp user %player% meta addprefix 2 &5|Select Purple]"
-      - "&fPrefix: [&d✿|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&d✿ &r\"|Bloom with this symbol], [&c❤|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&c❤ &r\"|Show your love], [&f♬|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&f♬ &r\"|Musical vibes], [&e✦|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&e✦ &r\"|Shine bright], [&6✯|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&6✯ &r\"|Add sparkle], [&9☄|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&9☄ &r\"|Cosmic style], [&a☀|lp user %player% meta removeprefix 3; lp user %player% meta addprefix 3 \"&a☀ &r\"|Sunny mood]"
-      - " &c[Reset Color and Prefix|lp user %player% meta removeprefix 2; lp user %player% meta removeprefix 3|Remove all selections]"
+      - text: "&fPick your Name Color and Prefix:"
+      - line:
+          - text: "&fColor: "
+          - button:
+              text: "&2Dark Green"
+              hover: "&aSelect Dark Green"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &2"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&aGreen"
+              hover: "&aSelect Green"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &a"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&eYellow"
+              hover: "&aSelect Yellow"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &e"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&6Orange"
+              hover: "&aSelect Orange"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &6"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&cRed"
+              hover: "&aSelect Red"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &c"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&9Blue"
+              hover: "&aSelect Blue"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &9"
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&5Purple"
+              hover: "&aSelect Purple"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta addprefix 2 &5"
+                - "msg %player% &aSetting updated"
+      - ""
+      - line:
+          - text: "&fPrefix: "
+          - button:
+              text: "&d✿"
+              hover: "&dBloom with this symbol"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&d✿ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&c❤"
+              hover: "&cShow your love"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&c❤ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&f♬"
+              hover: "&fMusical vibes"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&f♬ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&e✦"
+              hover: "&eShine bright"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&e✦ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&6✯"
+              hover: "&6Add sparkle"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&6✯ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&9☄"
+              hover: "&9Cosmic style"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&9☄ &r\""
+                - "msg %player% &aSetting updated"
+          - text: ", "
+          - button:
+              text: "&a☀"
+              hover: "&aSunny mood"
+              commands:
+                - "lp user %player% meta removeprefix 3"
+                - "lp user %player% meta addprefix 3 \"&a☀ &r\""
+                - "msg %player% &aSetting updated"
+      - line:
+          - button:
+              text: "&cReset Color and Prefix"
+              hover: "&cRemove all selections"
+              commands:
+                - "lp user %player% meta removeprefix 2"
+                - "lp user %player% meta removeprefix 3"
+                - "msg %player% &aSelections cleared"
 
   punish:
     permission: chatmenu.punish
     type: target
     message:
-      - "&cPunish Menu"
-      - "&7Targeting: &f%target%"
-      - "[&eWarn|warn %target%|Send a warning]"
-      - "[&6Mute|mute %target%|Mute player]"
-      - "[&cBan|ban %target%|Ban player]"
+      - text: "&cPunish Menu"
+      - text: "&7Targeting: &f%target%"
+      - line:
+          - button:
+              text: "&eWarn"
+              hover: "&7Send a warning"
+              commands: ["warn %target%"]
+              run-as: console
+              append-space: false
+          - text: " "
+          - button:
+              text: "&6Mute"
+              hover: "&eMute player"
+              commands: ["mute %target%"]
+              run-as: console
+              append-space: false
+          - text: " "
+          - button:
+              text: "&cBan"
+              hover: "&cBan player"
+              commands: ["ban %target%"]
+              run-as: console

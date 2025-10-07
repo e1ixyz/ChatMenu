@@ -10,7 +10,7 @@ commands:
     permission: chatmenu.admin
   cmrun:
     description: Internal command runner (used by ChatMenu clickable items)
-    usage: /cmrun <command...> <player>
+    usage: /cmrun <token>
 
 permissions:
   chatmenu.admin:

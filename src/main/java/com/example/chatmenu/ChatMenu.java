@@ -11,11 +11,13 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ChatMenu extends JavaPlugin {
 
@@ -30,8 +32,9 @@ public class ChatMenu extends JavaPlugin {
     private static final String LBR_SENTINEL = "\uE000";
     private static final String RBR_SENTINEL = "\uE001";
 
-    // PlaceholderAPI context selector
-    private enum PapiContext { VIEWER, TARGET }
+    // Pending command executions keyed by opaque tokens
+    private final Map<UUID, PendingBatch> pendingBatches = new ConcurrentHashMap<>();
+    private static final long PENDING_TTL_MS = 5 * 60_000L;
 
     public static ChatMenu getInstance() {
         return instance;
@@ -64,6 +67,7 @@ public class ChatMenu extends JavaPlugin {
     @Override
     public void onDisable() {
         unregisterDynamicCommands();
+        pendingBatches.clear();
         getLogger().info("ChatMenu disabled.");
     }
 
@@ -83,16 +87,351 @@ public class ChatMenu extends JavaPlugin {
             String typeStr = sec.getString("type", "self");
             CommandType type = CommandType.fromString(typeStr);
 
-            List<String> message = sec.getStringList("message");
-            if (message == null || message.isEmpty()) {
-                String single = sec.getString("message", "");
-                if (single != null && !single.isEmpty()) message = List.of(single);
-                else message = List.of();
-            }
-
-            CommandConfig cfg = new CommandConfig(key.toLowerCase(), permission, type, message);
+            List<CommandConfig.Line> lines = parseMessageDefinition(sec.get("message"), type);
+            CommandConfig cfg = new CommandConfig(key.toLowerCase(), permission, type, lines);
             commands.put(cfg.name, cfg);
         }
+    }
+
+    private List<CommandConfig.Line> parseMessageDefinition(Object rawMessage, CommandType type) {
+        List<CommandConfig.Line> lines = new ArrayList<>();
+        if (rawMessage instanceof List<?> list) {
+            for (Object entry : list) {
+                CommandConfig.Line line = parseMessageEntry(entry, type);
+                if (line != null) lines.add(line);
+            }
+        } else if (rawMessage instanceof ConfigurationSection section) {
+            lines.add(parseStructuredLine(section.get("line"), CommandConfig.PapiContext.fromString(section.get("context"), CommandConfig.PapiContext.VIEWER), type));
+        } else if (rawMessage instanceof String str) {
+            lines.add(parseLegacyLine(str));
+        } else if (rawMessage != null) {
+            lines.add(parseLegacyLine(String.valueOf(rawMessage)));
+        }
+        return lines;
+    }
+
+    private CommandConfig.Line parseMessageEntry(Object entry, CommandType type) {
+        if (entry == null) {
+            return new CommandConfig.Line(List.of());
+        }
+        if (entry instanceof String str) {
+            return parseLegacyLine(str);
+        }
+        if (entry instanceof ConfigurationSection section) {
+            return parseMessageEntry(section.getValues(false), type);
+        }
+        if (entry instanceof Map<?, ?> rawMap) {
+            return parseMapLine(rawMap, type);
+        }
+        if (entry instanceof List<?> list) {
+            return parseStructuredLine(list, CommandConfig.PapiContext.VIEWER, type);
+        }
+        return parseLegacyLine(entry.toString());
+    }
+
+    private CommandConfig.Line parseMapLine(Map<?, ?> rawMap, CommandType type) {
+        Map<String, Object> map = normalizeMap(rawMap);
+        CommandConfig.PapiContext defaultCtx = CommandConfig.PapiContext.fromString(map.get("context"), CommandConfig.PapiContext.VIEWER);
+
+        if (map.containsKey("line")) {
+            return parseStructuredLine(map.get("line"), defaultCtx, type);
+        }
+        if (map.containsKey("segments")) {
+            return parseStructuredLine(map.get("segments"), defaultCtx, type);
+        }
+        if (map.containsKey("raw")) {
+            return parseLegacyLine(String.valueOf(map.get("raw")));
+        }
+        if (map.containsKey("text") && map.size() == 1) {
+            return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx)));
+        }
+        if (map.containsKey("button")) {
+            CommandConfig.ButtonSegment button = parseButtonSegment(map, "button", defaultCtx, false);
+            return new CommandConfig.Line(List.of(button));
+        }
+        if (looksLikeButton(map)) {
+            CommandConfig.ButtonSegment button = parseButtonSegment(map, null, defaultCtx, false);
+            return new CommandConfig.Line(List.of(button));
+        }
+        if (map.containsKey("text")) {
+            return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx)));
+        }
+        return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(map.toString(), defaultCtx)));
+    }
+
+    private CommandConfig.Line parseStructuredLine(Object rawSegments, CommandConfig.PapiContext defaultCtx, CommandType type) {
+        if (rawSegments == null) {
+            return new CommandConfig.Line(List.of());
+        }
+
+        List<?> segmentList;
+        if (rawSegments instanceof List<?> list) {
+            segmentList = list;
+        } else if (rawSegments instanceof ConfigurationSection section) {
+            segmentList = List.of(section.getValues(false));
+        } else if (rawSegments instanceof Map<?, ?> map) {
+            segmentList = List.of(map);
+        } else if (rawSegments instanceof String str) {
+            segmentList = List.of(str);
+        } else {
+            segmentList = List.of(rawSegments.toString());
+        }
+
+        List<CommandConfig.Segment> segments = new ArrayList<>();
+        for (Object segObj : segmentList) {
+            CommandConfig.Segment segment = parseSegment(segObj, defaultCtx, type);
+            if (segment != null) segments.add(segment);
+        }
+        return new CommandConfig.Line(segments);
+    }
+
+    private CommandConfig.Segment parseSegment(Object raw, CommandConfig.PapiContext defaultCtx, CommandType type) {
+        if (raw == null) {
+            return new CommandConfig.TextSegment("", defaultCtx);
+        }
+        if (raw instanceof String str) {
+            return new CommandConfig.TextSegment(str, defaultCtx);
+        }
+        if (raw instanceof ConfigurationSection section) {
+            return parseSegment(section.getValues(false), defaultCtx, type);
+        }
+        if (raw instanceof Map<?, ?> rawMap) {
+            Map<String, Object> map = normalizeMap(rawMap);
+            CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(map.get("context"), defaultCtx);
+
+            if (map.containsKey("text") && !looksLikeButton(map)) {
+                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx);
+            }
+            if (map.containsKey("button")) {
+                return parseButtonSegment(map, "button", ctx, false);
+            }
+            if (looksLikeButton(map)) {
+                return parseButtonSegment(map, null, ctx, false);
+            }
+            if (map.containsKey("text")) {
+                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx);
+            }
+            if (map.containsKey("raw")) {
+                return new CommandConfig.TextSegment(String.valueOf(map.get("raw")), ctx);
+            }
+            return new CommandConfig.TextSegment(map.toString(), ctx);
+        }
+        if (raw instanceof List<?> list) {
+            return new CommandConfig.TextSegment(list.toString(), defaultCtx);
+        }
+        return new CommandConfig.TextSegment(raw.toString(), defaultCtx);
+    }
+
+    private CommandConfig.ButtonSegment parseButtonSegment(Map<String, Object> container, String nestedKey,
+                                                           CommandConfig.PapiContext inheritedCtx, boolean defaultAppendSpace) {
+        Map<String, Object> buttonSource = container;
+        if (nestedKey != null) {
+            buttonSource = normalizeMap(container.get(nestedKey));
+        }
+        if (buttonSource == null) buttonSource = Map.of();
+
+        String display = firstNonNull(buttonSource.get("text"), buttonSource.get("display"),
+                buttonSource.get("label"), "");
+        String hover = parseHover(buttonSource.containsKey("hover") ? buttonSource.get("hover") : buttonSource.get("tooltip"));
+
+        Object commandsObj = buttonSource.containsKey("commands") ? buttonSource.get("commands") : buttonSource.get("command");
+        List<String> commands = parseCommandList(commandsObj);
+
+        boolean defaultAsPlayer = parseDefaultRunAs(firstNonNull(buttonSource.get("run-as"), buttonSource.get("default-runner"),
+                container.get("run-as"), container.get("default-runner")));
+        boolean appendSpace = parseAppendSpace(firstNonNull(buttonSource.get("append-space"), buttonSource.get("spacing"),
+                container.get("append-space"), container.get("spacing")));
+        if (!appendSpace) appendSpace = defaultAppendSpace;
+
+        CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(firstNonNull(buttonSource.get("context"), container.get("context")), inheritedCtx);
+
+        return new CommandConfig.ButtonSegment(display, hover, commands, defaultAsPlayer, appendSpace, ctx);
+    }
+
+    private boolean looksLikeButton(Map<String, Object> map) {
+        return map.containsKey("commands") || map.containsKey("command") || map.containsKey("hover")
+                || map.containsKey("run-as") || map.containsKey("default-runner") || map.containsKey("display")
+                || map.containsKey("label");
+    }
+
+    private Map<String, Object> normalizeMap(Object source) {
+        if (source == null) return new LinkedHashMap<>();
+        if (source instanceof ConfigurationSection section) {
+            return new LinkedHashMap<>(section.getValues(false));
+        }
+        if (source instanceof Map<?, ?> rawMap) {
+            Map<String, Object> map = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                if (entry.getKey() != null) {
+                    map.put(entry.getKey().toString(), entry.getValue());
+                }
+            }
+            return map;
+        }
+        return new LinkedHashMap<>();
+    }
+
+    private String firstNonNull(Object... values) {
+        for (Object value : values) {
+            if (value != null) return String.valueOf(value);
+        }
+        return "";
+    }
+
+    private String parseHover(Object hoverObj) {
+        if (hoverObj == null) return "";
+        if (hoverObj instanceof String str) return str;
+        if (hoverObj instanceof List<?> list) {
+            StringBuilder sb = new StringBuilder();
+            for (Object part : list) {
+                if (part == null) continue;
+                if (sb.length() > 0) sb.append("\n");
+                sb.append(part);
+            }
+            return sb.toString();
+        }
+        return hoverObj.toString();
+    }
+
+    private boolean parseDefaultRunAs(Object raw) {
+        if (raw == null) return false;
+        String s = raw.toString().trim().toLowerCase(Locale.ROOT);
+        return s.equals("player") || s.equals("viewer") || s.equals("as_player") || s.equals("player_default");
+    }
+
+    private boolean parseAppendSpace(Object raw) {
+        if (raw == null) return false;
+        if (raw instanceof Boolean b) return b;
+        String s = raw.toString().trim().toLowerCase(Locale.ROOT);
+        return s.equals("true") || s.equals("yes") || s.equals("space") || s.equals("1");
+    }
+
+    private List<String> parseCommandList(Object raw) {
+        List<String> commands = new ArrayList<>();
+        if (raw == null) return commands;
+
+        if (raw instanceof String str) {
+            addCommandsFromString(commands, str);
+        } else if (raw instanceof List<?> list) {
+            for (Object entry : list) {
+                if (entry instanceof String str) {
+                    addCommandsFromString(commands, str);
+                } else if (entry instanceof Map<?, ?> map) {
+                    String cmd = parseCommandFromMap(normalizeMap(map));
+                    if (cmd != null && !cmd.isBlank()) commands.add(cmd);
+                } else if (entry instanceof ConfigurationSection section) {
+                    String cmd = parseCommandFromMap(new LinkedHashMap<>(section.getValues(false)));
+                    if (cmd != null && !cmd.isBlank()) commands.add(cmd);
+                }
+            }
+        } else if (raw instanceof Map<?, ?> map) {
+            String cmd = parseCommandFromMap(normalizeMap(map));
+            if (cmd != null && !cmd.isBlank()) commands.add(cmd);
+        } else if (raw instanceof ConfigurationSection section) {
+            String cmd = parseCommandFromMap(new LinkedHashMap<>(section.getValues(false)));
+            if (cmd != null && !cmd.isBlank()) commands.add(cmd);
+        }
+
+        return commands;
+    }
+
+    private void addCommandsFromString(List<String> commands, String raw) {
+        if (raw == null) return;
+        String[] parts = raw.split("\\s*;\\s*");
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) commands.add(trimmed);
+        }
+    }
+
+    private String parseCommandFromMap(Map<String, Object> map) {
+        if (map.isEmpty()) return null;
+        if (map.containsKey("player")) {
+            return "player:" + String.valueOf(map.get("player")).trim();
+        }
+        if (map.containsKey("console")) {
+            return "console:" + String.valueOf(map.get("console")).trim();
+        }
+        String command = firstNonNull(map.get("command"), map.get("value"));
+        if (command == null || command.isBlank()) return null;
+        boolean asPlayer = parseDefaultRunAs(firstNonNull(map.get("run-as"), map.get("executor"), map.get("default-runner")));
+        command = command.trim();
+        if (asPlayer) return command.startsWith("player:") || command.startsWith("console:") ? command : "player:" + command;
+        return command;
+    }
+
+    private CommandConfig.Line parseLegacyLine(String raw) {
+        LineCtx lc = extractLineContext(raw);
+        String working = preprocessBrackets(lc.text);
+        CommandConfig.PapiContext lineCtx = lc.ctx;
+
+        List<CommandConfig.Segment> segments = new ArrayList<>();
+
+        int idx = 0;
+        while ((idx = working.indexOf("[")) != -1) {
+            int end = working.indexOf("]", idx);
+            if (end == -1) break;
+
+            String beforeRaw = working.substring(0, idx);
+            if (!beforeRaw.isEmpty()) {
+                segments.add(new CommandConfig.TextSegment(restoreBrackets(beforeRaw), lineCtx));
+            }
+
+            String segment = working.substring(idx + 1, end);
+            String[] parts = segment.split("\\|", 4);
+
+            if (parts.length >= 3) {
+                String displayRaw = restoreBrackets(parts[0].trim());
+                String commandsRaw = restoreBrackets(parts[1].trim());
+                String hoverRaw = restoreBrackets(parts[2].trim());
+                String flagsRaw = parts.length >= 4 ? restoreBrackets(parts[3].trim()) : "";
+
+                boolean defaultAsPlayer = flagsDefaultAsPlayer(flagsRaw);
+                CommandConfig.PapiContext btnCtx = flagsPapiContext(flagsRaw, lineCtx);
+
+                List<String> commands = new ArrayList<>();
+                for (String c : commandsRaw.split("\\s*;\\s*")) {
+                    String cmd = c.trim();
+                    if (cmd.isEmpty()) continue;
+                    commands.add(cmd);
+                }
+
+                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, defaultAsPlayer, true, btnCtx));
+            } else {
+                segments.add(new CommandConfig.TextSegment(restoreBrackets("[" + segment + "]"), lineCtx));
+            }
+
+            working = working.substring(end + 1);
+            idx = 0;
+        }
+
+        if (!working.isEmpty()) {
+            segments.add(new CommandConfig.TextSegment(restoreBrackets(working), lineCtx));
+        } else if (segments.isEmpty()) {
+            segments.add(new CommandConfig.TextSegment("", lineCtx));
+        }
+
+        return new CommandConfig.Line(segments);
+    }
+
+    private List<String> encodeCommands(CommandConfig.ButtonSegment button) {
+        if (button.commands.isEmpty()) return List.of();
+        List<String> encoded = new ArrayList<>(button.commands.size());
+        for (String raw : button.commands) {
+            if (raw == null) continue;
+            String cmd = raw.trim();
+            if (cmd.isEmpty()) continue;
+            if (!hasExecutorPrefix(cmd) && button.defaultAsPlayer) {
+                cmd = "player:" + cmd;
+            }
+            encoded.add(cmd);
+        }
+        return encoded;
+    }
+
+    private boolean hasExecutorPrefix(String cmd) {
+        return cmd.regionMatches(true, 0, "player:", 0, 7)
+                || cmd.regionMatches(true, 0, "console:", 0, 8);
     }
 
     /* -------------------- dynamic register/unregister ------------------- */
@@ -218,32 +557,32 @@ public class ChatMenu extends JavaPlugin {
         return f.contains("as=player") || f.contains("runas=player") || f.equals("player");
     }
 
-    private PapiContext flagsPapiContext(String rawFlags, PapiContext fallback) {
+    private CommandConfig.PapiContext flagsPapiContext(String rawFlags, CommandConfig.PapiContext fallback) {
         if (rawFlags == null) return fallback;
         String f = rawFlags.toLowerCase(Locale.ROOT);
-        if (f.contains("ctx=target")) return PapiContext.TARGET;
-        if (f.contains("ctx=viewer")) return PapiContext.VIEWER;
+        if (f.contains("ctx=target")) return CommandConfig.PapiContext.TARGET;
+        if (f.contains("ctx=viewer")) return CommandConfig.PapiContext.VIEWER;
         return fallback;
     }
 
     // Detect and strip an optional per-line context directive: {{ctx=viewer}} or {{ctx=target}}
     private static class LineCtx {
         final String text;
-        final PapiContext ctx;
-        LineCtx(String text, PapiContext ctx) { this.text = text; this.ctx = ctx; }
+        final CommandConfig.PapiContext ctx;
+        LineCtx(String text, CommandConfig.PapiContext ctx) { this.text = text; this.ctx = ctx; }
     }
     private LineCtx extractLineContext(String raw) {
-        if (raw == null) return new LineCtx("", PapiContext.VIEWER);
+        if (raw == null) return new LineCtx("", CommandConfig.PapiContext.VIEWER);
         String s = raw;
-        PapiContext ctx = PapiContext.VIEWER;
+        CommandConfig.PapiContext ctx = CommandConfig.PapiContext.VIEWER;
         if (s.startsWith("{{") && s.toLowerCase(Locale.ROOT).startsWith("{{ctx=")) {
             int end = s.indexOf("}}");
             if (end > 0) {
                 String inside = s.substring(2, end).trim(); // ctx=target
                 String[] kv = inside.split("=", 2);
                 if (kv.length == 2) {
-                    if (kv[1].equalsIgnoreCase("target")) ctx = PapiContext.TARGET;
-                    if (kv[1].equalsIgnoreCase("viewer")) ctx = PapiContext.VIEWER;
+                    if (kv[1].equalsIgnoreCase("target")) ctx = CommandConfig.PapiContext.TARGET;
+                    if (kv[1].equalsIgnoreCase("viewer")) ctx = CommandConfig.PapiContext.VIEWER;
                 }
                 s = s.substring(end + 2).trim();
             }
@@ -252,77 +591,46 @@ public class ChatMenu extends JavaPlugin {
     }
 
     private void sendChatMenu(Player viewer, String targetName, CommandConfig cfg) {
-        for (String rawLine : cfg.message) {
-            LineCtx lc = extractLineContext(rawLine);
-            String working = preprocessBrackets(lc.text);
-            PapiContext lineCtx = lc.ctx;
-
+        for (CommandConfig.Line line : cfg.lines) {
             Component full = Component.empty();
 
-            int idx = 0;
-            while ((idx = working.indexOf("[")) != -1) {
-                int end = working.indexOf("]", idx);
-                if (end == -1) break;
+            for (CommandConfig.Segment segment : line.segments) {
+                CommandConfig.PapiContext ctx = segment.context();
 
-                String beforeRaw = working.substring(0, idx);
-                if (!beforeRaw.isEmpty()) {
-                    full = full.append(parseText(restoreBrackets(beforeRaw), viewer, targetName, lineCtx));
+                if (segment instanceof CommandConfig.TextSegment textSeg) {
+                    if (!textSeg.text.isEmpty()) {
+                        full = full.append(parseText(textSeg.text, viewer, targetName, ctx));
+                    } else {
+                        full = full.append(Component.text(""));
+                    }
+                    continue;
                 }
 
-                String segment = working.substring(idx + 1, end);
-                // Optional 4th part for flags: [display | commands | hover | flags]
-                String[] parts = segment.split("\\|", 4);
+                if (segment instanceof CommandConfig.ButtonSegment button) {
+                    Component displayComp = parseText(button.display, viewer, targetName, ctx);
+                    Component hoverComp = parseText(button.hover, viewer, targetName, ctx);
 
-                if (parts.length >= 3) {
-                    String displayRaw = restoreBrackets(parts[0].trim());
-                    String commandsRaw = restoreBrackets(parts[1].trim());
-                    String hoverRaw   = restoreBrackets(parts[2].trim());
-                    String flagsRaw   = parts.length >= 4 ? restoreBrackets(parts[3].trim()) : "";
+                    List<String> encoded = encodeCommands(button);
 
-                    boolean defaultAsPlayer = flagsDefaultAsPlayer(flagsRaw);
-                    PapiContext btnCtx = flagsPapiContext(flagsRaw, lineCtx);
+                    if (encoded.isEmpty()) {
+                        full = full.append(displayComp);
+                    } else {
+                        String viewerName = viewer.getName();
+                        String targetResolved = (cfg.type == CommandType.TARGET)
+                                ? (targetName == null ? viewerName : targetName)
+                                : viewerName;
 
-                    Component displayComp = parseText(displayRaw, viewer, targetName, btnCtx);
-                    Component hoverComp   = parseText(hoverRaw, viewer, targetName, btnCtx);
-
-                    String[] cmds = commandsRaw.split("\\s*;\\s*");
-                    List<String> encoded = new ArrayList<>(cmds.length);
-                    for (String c : cmds) {
-                        String cmd = c.trim();
-                        if (cmd.isEmpty()) continue;
-
-                        boolean hasPrefix = cmd.regionMatches(true, 0, "player:", 0, 7)
-                                || cmd.regionMatches(true, 0, "console:", 0, 8);
-                        if (defaultAsPlayer && !hasPrefix) {
-                            cmd = "player:" + cmd;
-                        }
-                        encoded.add(cmd);
+                        UUID token = registerPendingBatch(viewerName, targetResolved, encoded);
+                        Component clickable = displayComp
+                                .hoverEvent(HoverEvent.showText(hoverComp))
+                                .clickEvent(ClickEvent.runCommand("/cmrun " + token));
+                        full = full.append(clickable);
                     }
 
-                    String viewerName = viewer.getName();
-                    String targetResolved = (cfg.type == CommandType.TARGET)
-                            ? (targetName == null ? viewerName : targetName)
-                            : viewerName;
-
-                    // Pass BOTH viewer and target to cmrun (new protocol)
-                    String cmrun = "/cmrun " + String.join(";", encoded) + " " + viewerName + " " + targetResolved;
-
-                    Component clickable = displayComp
-                            .hoverEvent(HoverEvent.showText(hoverComp))
-                            .clickEvent(ClickEvent.runCommand(cmrun));
-
-                    full = full.append(clickable).append(Component.text(" "));
-                } else {
-                    // No pipes -> plain "[...]" text
-                    full = full.append(parseText(restoreBrackets("[" + segment + "]"), viewer, targetName, lineCtx));
+                    if (button.appendSpace) {
+                        full = full.append(Component.text(" "));
+                    }
                 }
-
-                working = working.substring(end + 1);
-                idx = 0;
-            }
-
-            if (!working.isEmpty()) {
-                full = full.append(parseText(restoreBrackets(working), viewer, targetName, lineCtx));
             }
 
             viewer.sendMessage(full);
@@ -330,6 +638,40 @@ public class ChatMenu extends JavaPlugin {
     }
 
     /* ---------- PlaceholderAPI context handling with Offline fallback ---------- */
+
+    static final class PendingBatch {
+        final String viewerName;
+        final String targetName;
+        final List<String> commands;
+        final long expiresAt;
+
+        PendingBatch(String viewerName, String targetName, List<String> commands) {
+            this.viewerName = viewerName;
+            this.targetName = targetName;
+            this.commands = commands;
+            this.expiresAt = System.currentTimeMillis() + PENDING_TTL_MS;
+        }
+    }
+
+    private void purgeExpiredBatches() {
+        long now = System.currentTimeMillis();
+        pendingBatches.entrySet().removeIf(e -> e.getValue().expiresAt < now);
+    }
+
+    UUID registerPendingBatch(String viewerName, String targetName, List<String> commands) {
+        purgeExpiredBatches();
+        UUID token = UUID.randomUUID();
+        pendingBatches.put(token, new PendingBatch(viewerName, targetName, List.copyOf(commands)));
+        return token;
+    }
+
+    PendingBatch claimPendingBatch(UUID token, String requesterName) {
+        purgeExpiredBatches();
+        PendingBatch batch = pendingBatches.remove(token);
+        if (batch == null) return null;
+        if (!batch.viewerName.equalsIgnoreCase(requesterName)) return null;
+        return batch;
+    }
 
     private OfflinePlayer resolvePapiPlayer(String name) {
         if (name == null || name.isEmpty()) return null;
@@ -353,7 +695,7 @@ public class ChatMenu extends JavaPlugin {
         return Bukkit.getOfflinePlayer(name);
     }
 
-    private Component parseText(String raw, Player viewer, String targetName, PapiContext ctx) {
+    private Component parseText(String raw, Player viewer, String targetName, CommandConfig.PapiContext ctx) {
         if (raw == null || raw.isEmpty()) return Component.empty();
 
         String s = raw.replace("%player%", viewer.getName());
@@ -361,7 +703,7 @@ public class ChatMenu extends JavaPlugin {
 
         try {
             if (Bukkit.getPluginManager().isPluginEnabled("PlaceholderAPI")) {
-                if (ctx == PapiContext.TARGET && targetName != null) {
+                if (ctx == CommandConfig.PapiContext.TARGET && targetName != null) {
                     OfflinePlayer ctxPlayer = resolvePapiPlayer(targetName);
                     if (ctxPlayer != null) {
                         s = PlaceholderAPI.setPlaceholders(ctxPlayer, s);

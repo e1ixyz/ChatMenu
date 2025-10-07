@@ -1,59 +1,59 @@
 package com.example.chatmenu;
 
+import com.example.chatmenu.ChatMenu.PendingBatch;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.UUID;
+
 public class CommandRunner implements CommandExecutor {
 
     /**
      * Internal:
-     *   NEW format: /cmrun <cmd1;cmd2;...> <viewerName> <targetName>
-     *   Legacy     : /cmrun <cmd1;cmd2;...> <name>           (both map to <name>)
-     *
-     * Per-command executor prefixes:
-     *   player:/coords      -> run as the clicking player (viewer)
-     *   console:/lp user ... -> run as console (default if no prefix)
-     *
-     * Placeholder replacement in each command before dispatch:
-     *   %player% -> viewerName
-     *   %target% -> targetName
-     *
-     * Leading "/" is optional for commands.
+     *   Tokenized format: /cmrun <uuid-token>
+     *   Tokens are issued per menu interaction, bound to the viewer name, and expire quickly.
      */
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length < 2) return false;
-
-        final String viewerName;
-        final String targetName;
-
-        int tailCount;
-        if (args.length >= 3) {
-            // NEW format: last two are viewer + target
-            viewerName = args[args.length - 2];
-            targetName = args[args.length - 1];
-            tailCount = 2;
-        } else {
-            // Legacy format: last one used for both
-            viewerName = args[args.length - 1];
-            targetName = args[args.length - 1];
-            tailCount = 1;
+        if (!(sender instanceof Player viewer)) {
+            sender.sendMessage("§cOnly players may invoke ChatMenu actions.");
+            return true;
         }
 
-        // Rebuild command string from the remaining args
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < args.length - tailCount; i++) {
-            if (i > 0) sb.append(" ");
-            sb.append(args[i]);
+        if (args.length != 1) {
+            viewer.sendMessage("§cInvalid ChatMenu invocation.");
+            return true;
         }
 
-        String[] commands = sb.toString().split("\\s*;\\s*");
-        for (int i = 0; i < commands.length; i++) {
-            String seg = commands[i].trim();
-            if (seg.isEmpty()) continue;
+        UUID token;
+        try {
+            token = UUID.fromString(args[0]);
+        } catch (IllegalArgumentException ex) {
+            viewer.sendMessage("§cThat menu action is no longer valid.");
+            return true;
+        }
+
+        ChatMenu plugin = ChatMenu.getInstance();
+        if (plugin == null) {
+            viewer.sendMessage("§cChatMenu is not ready.");
+            return true;
+        }
+
+        PendingBatch batch = plugin.claimPendingBatch(token, viewer.getName());
+        if (batch == null) {
+            viewer.sendMessage("§cThat menu action is no longer valid.");
+            return true;
+        }
+
+        final String viewerName = batch.viewerName;
+        final String targetName = batch.targetName != null ? batch.targetName : batch.viewerName;
+
+        for (int i = 0; i < batch.commands.size(); i++) {
+            String seg = batch.commands.get(i);
+            if (seg == null || seg.isEmpty()) continue;
 
             boolean runAsPlayer = false;
 
@@ -75,19 +75,19 @@ public class CommandRunner implements CommandExecutor {
             final long delay = i * 2L;
 
             if (runAsPlayer) {
-                Player p = Bukkit.getPlayerExact(viewerName);
-                if (p == null || !p.isOnline()) {
-                    sender.sendMessage("§cCannot run as player: " + viewerName + " is not online.");
+                Player onlineViewer = Bukkit.getPlayerExact(viewerName);
+                if (onlineViewer == null || !onlineViewer.isOnline()) {
+                    viewer.sendMessage("§cCannot run as player: you are no longer online.");
                     continue;
                 }
-                Bukkit.getScheduler().runTaskLater(ChatMenu.getInstance(),
-                        () -> p.performCommand(toExec), delay);
+                Bukkit.getScheduler().runTaskLater(plugin,
+                        () -> onlineViewer.performCommand(toExec), delay);
             } else {
-                Bukkit.getScheduler().runTaskLater(ChatMenu.getInstance(),
+                Bukkit.getScheduler().runTaskLater(plugin,
                         () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), toExec), delay);
             }
         }
 
         return true;
-        }
+    }
 }
