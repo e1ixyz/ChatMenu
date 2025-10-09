@@ -643,19 +643,27 @@ public class ChatMenu extends JavaPlugin {
         final String viewerName;
         final String targetName;
         final List<String> commands;
-        final long expiresAt;
+        private volatile long expiresAt;
 
         PendingBatch(String viewerName, String targetName, List<String> commands) {
             this.viewerName = viewerName;
             this.targetName = targetName;
             this.commands = commands;
-            this.expiresAt = System.currentTimeMillis() + PENDING_TTL_MS;
+            touch(System.currentTimeMillis());
+        }
+
+        boolean isExpired(long now) {
+            return expiresAt < now;
+        }
+
+        void touch(long now) {
+            this.expiresAt = now + PENDING_TTL_MS;
         }
     }
 
     private void purgeExpiredBatches() {
         long now = System.currentTimeMillis();
-        pendingBatches.entrySet().removeIf(e -> e.getValue().expiresAt < now);
+        pendingBatches.entrySet().removeIf(e -> e.getValue().isExpired(now));
     }
 
     UUID registerPendingBatch(String viewerName, String targetName, List<String> commands) {
@@ -667,9 +675,17 @@ public class ChatMenu extends JavaPlugin {
 
     PendingBatch claimPendingBatch(UUID token, String requesterName) {
         purgeExpiredBatches();
-        PendingBatch batch = pendingBatches.remove(token);
+        PendingBatch batch = pendingBatches.get(token);
         if (batch == null) return null;
         if (!batch.viewerName.equalsIgnoreCase(requesterName)) return null;
+
+        long now = System.currentTimeMillis();
+        if (batch.isExpired(now)) {
+            pendingBatches.remove(token);
+            return null;
+        }
+
+        batch.touch(now);
         return batch;
     }
 
