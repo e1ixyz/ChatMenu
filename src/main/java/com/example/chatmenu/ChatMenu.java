@@ -244,8 +244,9 @@ public class ChatMenu extends JavaPlugin {
         if (!appendSpace) appendSpace = defaultAppendSpace;
 
         CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(firstNonNull(buttonSource.get("context"), container.get("context")), inheritedCtx);
+        List<CommandConfig.Notification> notifications = parseNotifications(buttonSource, container);
 
-        return new CommandConfig.ButtonSegment(display, hover, commands, defaultAsPlayer, appendSpace, ctx);
+        return new CommandConfig.ButtonSegment(display, hover, commands, defaultAsPlayer, appendSpace, notifications, ctx);
     }
 
     private boolean looksLikeButton(Map<String, Object> map) {
@@ -360,6 +361,64 @@ public class ChatMenu extends JavaPlugin {
         return command;
     }
 
+    private List<CommandConfig.Notification> parseNotifications(Map<String, Object> buttonSource, Map<String, Object> container) {
+        List<CommandConfig.Notification> notifications = new ArrayList<>();
+
+        addNotifications(notifications, coalesce(buttonSource.get("notify"), container.get("notify")), null);
+        addNotifications(notifications, coalesce(buttonSource.get("notify-viewer"), container.get("notify-viewer")), CommandConfig.Notification.Audience.VIEWER);
+        addNotifications(notifications, coalesce(buttonSource.get("notify-target"), container.get("notify-target")), CommandConfig.Notification.Audience.TARGET);
+
+        return notifications.isEmpty() ? List.of() : List.copyOf(notifications);
+    }
+
+    private void addNotifications(List<CommandConfig.Notification> out, Object raw, CommandConfig.Notification.Audience forcedAudience) {
+        if (raw == null) return;
+
+        if (raw instanceof List<?> list) {
+            for (Object entry : list) {
+                addNotifications(out, entry, forcedAudience);
+            }
+            return;
+        }
+
+        if (raw instanceof Map<?, ?> rawMap) {
+            Map<String, Object> map = normalizeMap(rawMap);
+
+            if (map.containsKey("viewer") || map.containsKey("target")) {
+                addNotifications(out, map.get("viewer"), CommandConfig.Notification.Audience.VIEWER);
+                addNotifications(out, map.get("target"), CommandConfig.Notification.Audience.TARGET);
+                return;
+            }
+
+            CommandConfig.Notification.Audience audience = forcedAudience;
+            if (audience == null) {
+                audience = CommandConfig.Notification.Audience.fromString(firstNonNull(map.get("audience"), map.get("recipient"), map.get("role")));
+            }
+
+            Object messageObj = firstNonNull(map.get("message"), map.get("text"), map.get("value"));
+            if (messageObj == null || String.valueOf(messageObj).isBlank()) {
+                return;
+            }
+
+            CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(map.get("context"), null);
+            if (audience == null) audience = CommandConfig.Notification.Audience.VIEWER;
+            out.add(new CommandConfig.Notification(audience, String.valueOf(messageObj), ctx));
+            return;
+        }
+
+        String message = String.valueOf(raw);
+        if (message.isBlank()) return;
+        CommandConfig.Notification.Audience audience = forcedAudience != null ? forcedAudience : CommandConfig.Notification.Audience.VIEWER;
+        out.add(new CommandConfig.Notification(audience, message, null));
+    }
+
+    private Object coalesce(Object... values) {
+        for (Object value : values) {
+            if (value != null) return value;
+        }
+        return null;
+    }
+
     private CommandConfig.Line parseLegacyLine(String raw) {
         LineCtx lc = extractLineContext(raw);
         String working = preprocessBrackets(lc.text);
@@ -396,7 +455,7 @@ public class ChatMenu extends JavaPlugin {
                     commands.add(cmd);
                 }
 
-                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, defaultAsPlayer, true, btnCtx));
+                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, defaultAsPlayer, true, List.of(), btnCtx));
             } else {
                 segments.add(new CommandConfig.TextSegment(restoreBrackets("[" + segment + "]"), lineCtx));
             }
@@ -611,20 +670,21 @@ public class ChatMenu extends JavaPlugin {
                     Component hoverComp = parseText(button.hover, viewer, targetName, ctx);
 
                     List<String> encoded = encodeCommands(button);
+                    boolean hasWork = !encoded.isEmpty() || !button.notifications.isEmpty();
 
-                    if (encoded.isEmpty()) {
-                        full = full.append(displayComp);
-                    } else {
+                    if (hasWork) {
                         String viewerName = viewer.getName();
                         String targetResolved = (cfg.type == CommandType.TARGET)
                                 ? (targetName == null ? viewerName : targetName)
                                 : viewerName;
 
-                        UUID token = registerPendingBatch(viewerName, targetResolved, encoded);
+                        UUID token = registerPendingBatch(viewerName, targetResolved, encoded, button.notifications);
                         Component clickable = displayComp
                                 .hoverEvent(HoverEvent.showText(hoverComp))
                                 .clickEvent(ClickEvent.runCommand("/cmrun " + token));
                         full = full.append(clickable);
+                    } else {
+                        full = full.append(displayComp);
                     }
 
                     if (button.appendSpace) {
@@ -643,12 +703,15 @@ public class ChatMenu extends JavaPlugin {
         final String viewerName;
         final String targetName;
         final List<String> commands;
+        final List<CommandConfig.Notification> notifications;
         private volatile long expiresAt;
 
-        PendingBatch(String viewerName, String targetName, List<String> commands) {
+        PendingBatch(String viewerName, String targetName, List<String> commands,
+                     List<CommandConfig.Notification> notifications) {
             this.viewerName = viewerName;
             this.targetName = targetName;
-            this.commands = commands;
+            this.commands = commands == null ? List.of() : List.copyOf(commands);
+            this.notifications = notifications == null ? List.of() : List.copyOf(notifications);
             touch(System.currentTimeMillis());
         }
 
@@ -666,10 +729,11 @@ public class ChatMenu extends JavaPlugin {
         pendingBatches.entrySet().removeIf(e -> e.getValue().isExpired(now));
     }
 
-    UUID registerPendingBatch(String viewerName, String targetName, List<String> commands) {
+    UUID registerPendingBatch(String viewerName, String targetName, List<String> commands,
+                              List<CommandConfig.Notification> notifications) {
         purgeExpiredBatches();
         UUID token = UUID.randomUUID();
-        pendingBatches.put(token, new PendingBatch(viewerName, targetName, List.copyOf(commands)));
+        pendingBatches.put(token, new PendingBatch(viewerName, targetName, commands, notifications));
         return token;
     }
 
@@ -711,7 +775,7 @@ public class ChatMenu extends JavaPlugin {
         return Bukkit.getOfflinePlayer(name);
     }
 
-    private Component parseText(String raw, Player viewer, String targetName, CommandConfig.PapiContext ctx) {
+    Component parseText(String raw, Player viewer, String targetName, CommandConfig.PapiContext ctx) {
         if (raw == null || raw.isEmpty()) return Component.empty();
 
         String s = raw.replace("%player%", viewer.getName());

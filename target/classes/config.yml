@@ -156,6 +156,8 @@ commands:
               commands: ["warn %target%"]
               run-as: console
               append-space: false
+              notify:
+                viewer: "&fPunishment issued"
           - text: " "
           - button:
               text: "&6Mute"
@@ -163,6 +165,8 @@ commands:
               commands: ["mute %target%"]
               run-as: console
               append-space: false
+              notify:
+                viewer: "&fPunishment issued"
           - text: " "
           - button:
               text: "&cBan"

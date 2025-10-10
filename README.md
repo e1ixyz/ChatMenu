@@ -5,6 +5,7 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 ## Features
 - **Dynamic commands** – every child under `commands:` becomes `/yourcommand` at runtime, with optional self/target modes and tab-complete for target menus.
 - **Structured YAML menus** – compose lines from `text` and `button` segments so large inline menus stay readable. Legacy bracket syntax (`[display|commands|hover]`) still works for existing configs.
+- **Inline notifications** – add `notify.viewer` / `notify.target` to a button to send feedback without padding the config with `/tellraw`.
 - **Console or player execution** – choose executors per button (`run-as: player`) or per command (`player:/cmd`). `%player%` and `%target%` placeholders are substituted at runtime.
 - **PlaceholderAPI aware** – render text/hover with viewer or target context (`context: target`). Offline lookups are attempted when needed.
 - **Reload safe** – `/chatmenu reload` re-parses config, registers new commands, and retires old ones without a server restart.
@@ -56,6 +57,7 @@ commands:
   - `hover`: tooltip; accepts a string or list of strings (joined with newlines).
   - `commands`: string or list. Strings can include `;` to sequence actions. You may also use objects such as `{player: "msg %player% hi"}` or `{command: "op %player%", run-as: console}`.
   - `run-as`: optional default executor for commands without a prefix (`player | console`).
+  - `notify`: string/map/list; use keys like `viewer:` / `target:` (or `notify-viewer`, `notify-target`) to have the plugin message players once the button completes.
   - `append-space`: add a trailing space after the button (default `false`; legacy lines keep the old behaviour).
   - `context`: choose PlaceholderAPI context per segment (`viewer | target`); defaults to the surrounding line.
 

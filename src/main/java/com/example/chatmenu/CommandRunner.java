@@ -1,12 +1,14 @@
 package com.example.chatmenu;
 
 import com.example.chatmenu.ChatMenu.PendingBatch;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.UUID;
 
 public class CommandRunner implements CommandExecutor {
@@ -86,6 +88,37 @@ public class CommandRunner implements CommandExecutor {
                 Bukkit.getScheduler().runTaskLater(plugin,
                         () -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), toExec), delay);
             }
+        }
+
+        List<CommandConfig.Notification> notifications = batch.notifications;
+        if (!notifications.isEmpty()) {
+            long notifyDelay = batch.commands.isEmpty() ? 0L : (batch.commands.size() * 2L);
+            final Player viewerSnapshot = viewer;
+            final String targetSnapshot = targetName;
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                Player targetPlayer = targetSnapshot == null ? null : Bukkit.getPlayerExact(targetSnapshot);
+
+                for (CommandConfig.Notification note : notifications) {
+                    Component msg = plugin.parseText(note.message, viewerSnapshot, targetSnapshot, note.context);
+                    switch (note.audience) {
+                        case VIEWER -> {
+                            if (viewerSnapshot != null && viewerSnapshot.isOnline()) {
+                                viewerSnapshot.sendMessage(msg);
+                            }
+                        }
+                        case TARGET -> {
+                            if (targetPlayer != null && targetPlayer.isOnline()) {
+                                targetPlayer.sendMessage(msg);
+                            } else if (viewerSnapshot != null && viewerSnapshot.isOnline()
+                                    && (targetSnapshot == null
+                                    || !viewerSnapshot.getName().equalsIgnoreCase(targetSnapshot))) {
+                                viewerSnapshot.sendMessage(msg);
+                            }
+                        }
+                    }
+                }
+            }, notifyDelay);
         }
 
         return true;

@@ -63,21 +63,52 @@ public class CommandConfig {
         public final List<String> commands;
         public final boolean defaultAsPlayer;
         public final boolean appendSpace;
+        public final List<Notification> notifications;
         private final PapiContext context;
 
         public ButtonSegment(String display, String hover, List<String> commands,
-                             boolean defaultAsPlayer, boolean appendSpace, PapiContext context) {
+                             boolean defaultAsPlayer, boolean appendSpace,
+                             List<Notification> notifications, PapiContext context) {
             this.display = display == null ? "" : display;
             this.hover = hover == null ? "" : hover;
             this.commands = commands == null ? List.of() : List.copyOf(commands);
             this.defaultAsPlayer = defaultAsPlayer;
             this.appendSpace = appendSpace;
+            this.notifications = notifications == null ? List.of() : List.copyOf(notifications);
             this.context = context == null ? PapiContext.VIEWER : context;
         }
 
         @Override
         public PapiContext context() {
             return context;
+        }
+    }
+
+    public static final class Notification {
+        public enum Audience {
+            VIEWER, TARGET;
+
+            public static Audience fromString(Object value) {
+                if (value == null) return null;
+                String s = value.toString().trim().toLowerCase(Locale.ROOT);
+                return switch (s) {
+                    case "viewer", "player", "clicker", "self" -> VIEWER;
+                    case "target" -> TARGET;
+                    default -> null;
+                };
+            }
+        }
+
+        public final Audience audience;
+        public final String message;
+        public final PapiContext context;
+
+        public Notification(Audience audience, String message, PapiContext context) {
+            if (audience == null) audience = Audience.VIEWER;
+            this.audience = audience;
+            this.message = message == null ? "" : message;
+            this.context = context != null ? context :
+                    (audience == Audience.TARGET ? PapiContext.TARGET : PapiContext.VIEWER);
         }
     }
 }
