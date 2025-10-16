@@ -16,6 +16,9 @@ import jakarta.inject.Inject;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 @Plugin(
         id = "chatmenuproxy",
@@ -26,9 +29,11 @@ import java.util.logging.Logger;
 public final class ChatMenuProxyPlugin {
 
     private static final MinecraftChannelIdentifier CHANNEL = MinecraftChannelIdentifier.from("chatmenu:proxy");
+    private static final long DUPLICATE_SUPPRESSION_WINDOW_NANOS = TimeUnit.MILLISECONDS.toNanos(250);
 
     private final ProxyServer proxy;
     private final Logger logger;
+    private final Map<UUID, CommandStamp> recentCommands = new ConcurrentHashMap<>();
 
     @Inject
     public ChatMenuProxyPlugin(ProxyServer proxy, Logger logger) {
@@ -49,6 +54,7 @@ public final class ChatMenuProxyPlugin {
     @Subscribe
     public void onShutdown(ProxyShutdownEvent event) {
         proxy.getChannelRegistrar().unregister(CHANNEL);
+        recentCommands.clear();
     }
 
     @Subscribe
@@ -91,6 +97,10 @@ public final class ChatMenuProxyPlugin {
             return;
         }
         if (command.isEmpty()) {
+            return;
+        }
+
+        if (!markExecution(player, command)) {
             return;
         }
 
@@ -147,4 +157,20 @@ public final class ChatMenuProxyPlugin {
             return PLAYER;
         }
     }
+
+    private boolean markExecution(Player player, String command) {
+        UUID id = player.getUniqueId();
+        long now = System.nanoTime();
+        CommandStamp previous = recentCommands.get(id);
+        if (previous != null) {
+            if (now - previous.timestamp() < DUPLICATE_SUPPRESSION_WINDOW_NANOS
+                    && previous.command().equalsIgnoreCase(command)) {
+                return false;
+            }
+        }
+        recentCommands.put(id, new CommandStamp(command, now));
+        return true;
+    }
+
+    private record CommandStamp(String command, long timestamp) {}
 }
