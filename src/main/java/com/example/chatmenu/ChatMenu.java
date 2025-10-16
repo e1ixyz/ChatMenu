@@ -35,6 +35,7 @@ public class ChatMenu extends JavaPlugin {
     // Pending command executions keyed by opaque tokens
     private final Map<UUID, PendingBatch> pendingBatches = new ConcurrentHashMap<>();
     private static final long PENDING_TTL_MS = 5 * 60_000L;
+    private ProxyCommandBridge proxyBridge;
 
     public static ChatMenu getInstance() {
         return instance;
@@ -45,6 +46,8 @@ public class ChatMenu extends JavaPlugin {
         instance = this;
         saveDefaultConfig();
         loadCommands();
+        proxyBridge = new ProxyCommandBridge(this);
+        proxyBridge.register();
 
         if (getCommand("cmrun") != null) getCommand("cmrun").setExecutor(new CommandRunner());
         if (getCommand("chatmenu") != null) getCommand("chatmenu").setExecutor((sender, cmd, label, args) -> {
@@ -68,6 +71,10 @@ public class ChatMenu extends JavaPlugin {
     public void onDisable() {
         unregisterDynamicCommands();
         pendingBatches.clear();
+        if (proxyBridge != null) {
+            proxyBridge.unregister();
+            proxyBridge = null;
+        }
         getLogger().info("ChatMenu disabled.");
     }
 
@@ -237,7 +244,7 @@ public class ChatMenu extends JavaPlugin {
         Object commandsObj = buttonSource.containsKey("commands") ? buttonSource.get("commands") : buttonSource.get("command");
         List<String> commands = parseCommandList(commandsObj);
 
-        boolean defaultAsPlayer = parseDefaultRunAs(firstNonNull(buttonSource.get("run-as"), buttonSource.get("default-runner"),
+        CommandConfig.CommandExecutor defaultExecutor = parseDefaultExecutor(firstNonNull(buttonSource.get("run-as"), buttonSource.get("default-runner"),
                 container.get("run-as"), container.get("default-runner")));
         boolean appendSpace = parseAppendSpace(firstNonNull(buttonSource.get("append-space"), buttonSource.get("spacing"),
                 container.get("append-space"), container.get("spacing")));
@@ -246,7 +253,7 @@ public class ChatMenu extends JavaPlugin {
         CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(firstNonNull(buttonSource.get("context"), container.get("context")), inheritedCtx);
         List<CommandConfig.Notification> notifications = parseNotifications(buttonSource, container);
 
-        return new CommandConfig.ButtonSegment(display, hover, commands, defaultAsPlayer, appendSpace, notifications, ctx);
+        return new CommandConfig.ButtonSegment(display, hover, commands, defaultExecutor, appendSpace, notifications, ctx);
     }
 
     private boolean looksLikeButton(Map<String, Object> map) {
@@ -294,10 +301,8 @@ public class ChatMenu extends JavaPlugin {
         return hoverObj.toString();
     }
 
-    private boolean parseDefaultRunAs(Object raw) {
-        if (raw == null) return false;
-        String s = raw.toString().trim().toLowerCase(Locale.ROOT);
-        return s.equals("player") || s.equals("viewer") || s.equals("as_player") || s.equals("player_default");
+    private CommandConfig.CommandExecutor parseDefaultExecutor(Object raw) {
+        return CommandConfig.CommandExecutor.fromString(raw, CommandConfig.CommandExecutor.CONSOLE);
     }
 
     private boolean parseAppendSpace(Object raw) {
@@ -353,11 +358,25 @@ public class ChatMenu extends JavaPlugin {
         if (map.containsKey("console")) {
             return "console:" + String.valueOf(map.get("console")).trim();
         }
+        if (map.containsKey("proxy-player")) {
+            return "proxy-player:" + String.valueOf(map.get("proxy-player")).trim();
+        }
+        if (map.containsKey("proxy-console")) {
+            return "proxy-console:" + String.valueOf(map.get("proxy-console")).trim();
+        }
+        if (map.containsKey("proxy")) {
+            return "proxy:" + String.valueOf(map.get("proxy")).trim();
+        }
         String command = firstNonNull(map.get("command"), map.get("value"));
         if (command == null || command.isBlank()) return null;
-        boolean asPlayer = parseDefaultRunAs(firstNonNull(map.get("run-as"), map.get("executor"), map.get("default-runner")));
         command = command.trim();
-        if (asPlayer) return command.startsWith("player:") || command.startsWith("console:") ? command : "player:" + command;
+        if (command.isEmpty()) return null;
+
+        CommandConfig.CommandExecutor executor = parseDefaultExecutor(firstNonNull(
+                map.get("run-as"), map.get("executor"), map.get("default-runner")));
+        if (!hasExecutorPrefix(command)) {
+            command = applyExecutorPrefix(executor, command);
+        }
         return command;
     }
 
@@ -455,7 +474,10 @@ public class ChatMenu extends JavaPlugin {
                     commands.add(cmd);
                 }
 
-                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, defaultAsPlayer, true, List.of(), btnCtx));
+                CommandConfig.CommandExecutor legacyExecutor = defaultAsPlayer
+                        ? CommandConfig.CommandExecutor.PLAYER
+                        : CommandConfig.CommandExecutor.CONSOLE;
+                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, legacyExecutor, true, List.of(), btnCtx));
             } else {
                 segments.add(new CommandConfig.TextSegment(restoreBrackets("[" + segment + "]"), lineCtx));
             }
@@ -476,12 +498,13 @@ public class ChatMenu extends JavaPlugin {
     private List<String> encodeCommands(CommandConfig.ButtonSegment button) {
         if (button.commands.isEmpty()) return List.of();
         List<String> encoded = new ArrayList<>(button.commands.size());
+        CommandConfig.CommandExecutor defaultExecutor = button.defaultExecutor;
         for (String raw : button.commands) {
             if (raw == null) continue;
             String cmd = raw.trim();
             if (cmd.isEmpty()) continue;
-            if (!hasExecutorPrefix(cmd) && button.defaultAsPlayer) {
-                cmd = "player:" + cmd;
+            if (!hasExecutorPrefix(cmd)) {
+                cmd = applyExecutorPrefix(defaultExecutor, cmd);
             }
             encoded.add(cmd);
         }
@@ -489,8 +512,44 @@ public class ChatMenu extends JavaPlugin {
     }
 
     private boolean hasExecutorPrefix(String cmd) {
-        return cmd.regionMatches(true, 0, "player:", 0, 7)
-                || cmd.regionMatches(true, 0, "console:", 0, 8);
+        return startsWithIgnoreCase(cmd, "player:")
+                || startsWithIgnoreCase(cmd, "console:")
+                || startsWithIgnoreCase(cmd, "proxy:")
+                || startsWithIgnoreCase(cmd, "proxy-player:")
+                || startsWithIgnoreCase(cmd, "proxy-console:");
+    }
+
+    private boolean startsWithIgnoreCase(String value, String prefix) {
+        if (value == null || prefix == null) return false;
+        if (value.length() < prefix.length()) return false;
+        return value.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    private String applyExecutorPrefix(CommandConfig.CommandExecutor executor, String command) {
+        if (command == null || command.isEmpty()) return command;
+        if (executor == null) executor = CommandConfig.CommandExecutor.CONSOLE;
+        switch (executor) {
+            case PLAYER:
+                return startsWithIgnoreCase(command, "player:") ? command : "player:" + command;
+            case PROXY_PLAYER:
+                if (startsWithIgnoreCase(command, "proxy-player:") || startsWithIgnoreCase(command, "proxy:")) {
+                    return command;
+                }
+                return "proxy:" + command;
+            case PROXY_CONSOLE:
+                if (startsWithIgnoreCase(command, "proxy-console:")) {
+                    return command;
+                }
+                return "proxy-console:" + command;
+            case CONSOLE:
+        default:
+            return command;
+        }
+    }
+
+    public enum ProxyCommandMode {
+        PLAYER,
+        CONSOLE
     }
 
     /* -------------------- dynamic register/unregister ------------------- */
@@ -727,6 +786,15 @@ public class ChatMenu extends JavaPlugin {
     private void purgeExpiredBatches() {
         long now = System.currentTimeMillis();
         pendingBatches.entrySet().removeIf(e -> e.getValue().isExpired(now));
+    }
+
+    boolean dispatchProxyCommand(Player source, ProxyCommandMode mode, String command) {
+        if (source == null || command == null || command.isEmpty()) return false;
+        if (proxyBridge == null) {
+            getLogger().warning("Proxy bridge unavailable; could not forward command '" + command + "'.");
+            return false;
+        }
+        return proxyBridge.dispatch(source, mode == null ? ProxyCommandMode.PLAYER : mode, command);
     }
 
     UUID registerPendingBatch(String viewerName, String targetName, List<String> commands,

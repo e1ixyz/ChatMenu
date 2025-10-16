@@ -55,19 +55,10 @@ public class CommandRunner implements CommandExecutor {
 
         for (int i = 0; i < batch.commands.size(); i++) {
             String seg = batch.commands.get(i);
-            if (seg == null || seg.isEmpty()) continue;
+            ExecutionPlan plan = ExecutionPlan.parse(seg);
+            if (plan == null) continue;
 
-            boolean runAsPlayer = false;
-
-            if (seg.regionMatches(true, 0, "player:", 0, 7)) {
-                runAsPlayer = true;
-                seg = seg.substring(7).trim();
-            } else if (seg.regionMatches(true, 0, "console:", 0, 8)) {
-                runAsPlayer = false;
-                seg = seg.substring(8).trim();
-            }
-
-            String cmdFinal = seg
+            String cmdFinal = plan.command()
                     .replace("%player%", viewerName)
                     .replace("%target%", targetName);
 
@@ -76,7 +67,24 @@ public class CommandRunner implements CommandExecutor {
             final String toExec = cmdFinal;
             final long delay = i * 2L;
 
-            if (runAsPlayer) {
+            if (plan.proxy()) {
+                Player onlineViewer = Bukkit.getPlayerExact(viewerName);
+                if (onlineViewer == null || !onlineViewer.isOnline()) {
+                    viewer.sendMessage("§cCannot run proxy command: you are no longer online.");
+                    continue;
+                }
+                final ChatMenu.ProxyCommandMode mode = plan.proxyMode();
+                final Player viewerSnapshot = viewer;
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    boolean ok = plugin.dispatchProxyCommand(onlineViewer, mode, toExec);
+                    if (!ok && viewerSnapshot.isOnline()) {
+                        viewerSnapshot.sendMessage("§cThat proxy action could not be delivered.");
+                    }
+                }, delay);
+                continue;
+            }
+
+            if (plan.runAsPlayer()) {
                 Player onlineViewer = Bukkit.getPlayerExact(viewerName);
                 if (onlineViewer == null || !onlineViewer.isOnline()) {
                     viewer.sendMessage("§cCannot run as player: you are no longer online.");
@@ -122,5 +130,80 @@ public class CommandRunner implements CommandExecutor {
         }
 
         return true;
+    }
+
+    private record ExecutionPlan(String command, boolean proxy, boolean runAsPlayer,
+                                 ChatMenu.ProxyCommandMode proxyMode) {
+
+        static ExecutionPlan parse(String raw) {
+            if (raw == null) return null;
+            String work = raw.trim();
+            if (work.isEmpty()) return null;
+
+            if (startsWithIgnoreCase(work, "proxy-console:") || startsWithIgnoreCase(work, "proxy_console:")
+                    || startsWithIgnoreCase(work, "proxyconsole:")) {
+                String cmd = stripPrefix(work, "proxy-console:", "proxy_console:", "proxyconsole:");
+                cmd = trimLeadingSlash(cmd);
+                return cmd.isEmpty() ? null : new ExecutionPlan(cmd, true, false, ChatMenu.ProxyCommandMode.CONSOLE);
+            }
+
+            if (startsWithIgnoreCase(work, "proxy-player:") || startsWithIgnoreCase(work, "proxy_player:")
+                    || startsWithIgnoreCase(work, "proxyplayer:")) {
+                String cmd = stripPrefix(work, "proxy-player:", "proxy_player:", "proxyplayer:");
+                cmd = trimLeadingSlash(cmd);
+                return cmd.isEmpty() ? null : new ExecutionPlan(cmd, true, false, ChatMenu.ProxyCommandMode.PLAYER);
+            }
+
+            if (startsWithIgnoreCase(work, "proxy:")) {
+                work = stripPrefix(work, "proxy:");
+                if (startsWithIgnoreCase(work, "console:")) {
+                    String cmd = trimLeadingSlash(stripPrefix(work, "console:"));
+                    return cmd.isEmpty() ? null : new ExecutionPlan(cmd, true, false, ChatMenu.ProxyCommandMode.CONSOLE);
+                }
+                if (startsWithIgnoreCase(work, "player:")) {
+                    String cmd = trimLeadingSlash(stripPrefix(work, "player:"));
+                    return cmd.isEmpty() ? null : new ExecutionPlan(cmd, true, false, ChatMenu.ProxyCommandMode.PLAYER);
+                }
+                String cmd = trimLeadingSlash(work);
+                return cmd.isEmpty() ? null : new ExecutionPlan(cmd, true, false, ChatMenu.ProxyCommandMode.PLAYER);
+            }
+
+            boolean runAsPlayer = false;
+            if (startsWithIgnoreCase(work, "player:")) {
+                runAsPlayer = true;
+                work = stripPrefix(work, "player:");
+            } else if (startsWithIgnoreCase(work, "console:")) {
+                work = stripPrefix(work, "console:");
+            }
+
+            String cmd = trimLeadingSlash(work);
+            if (cmd.isEmpty()) return null;
+            return new ExecutionPlan(cmd, false, runAsPlayer, null);
+        }
+
+        private static boolean startsWithIgnoreCase(String value, String prefix) {
+            if (value == null || prefix == null) return false;
+            if (value.length() < prefix.length()) return false;
+            return value.regionMatches(true, 0, prefix, 0, prefix.length());
+        }
+
+        private static String stripPrefix(String value, String... prefixes) {
+            if (value == null) return "";
+            for (String prefix : prefixes) {
+                if (startsWithIgnoreCase(value, prefix)) {
+                    return value.substring(prefix.length()).trim();
+                }
+            }
+            return value.trim();
+        }
+
+        private static String trimLeadingSlash(String value) {
+            if (value == null) return "";
+            String result = value.trim();
+            if (result.startsWith("/")) {
+                result = result.substring(1).trim();
+            }
+            return result;
+        }
     }
 }

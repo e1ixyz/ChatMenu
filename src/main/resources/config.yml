@@ -5,7 +5,7 @@
 #   text        -> label shown in chat
 #   hover       -> tooltip (string or list of strings)
 #   commands    -> string or list (supports ; to chain actions)
-#   run-as      -> player | console  (defaults to console)
+#   run-as      -> player | console | proxy-player | proxy-console (defaults to console)
 #   context     -> viewer | target   (PlaceholderAPI render context)
 #   append-space -> add a trailing space after the button (default false)
 # Placeholders:

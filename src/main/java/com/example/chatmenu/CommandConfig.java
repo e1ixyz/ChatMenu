@@ -57,22 +57,55 @@ public class CommandConfig {
         }
     }
 
+    public enum CommandExecutor {
+        CONSOLE,
+        PLAYER,
+        PROXY_PLAYER,
+        PROXY_CONSOLE;
+
+        public boolean isProxy() {
+            return this == PROXY_PLAYER || this == PROXY_CONSOLE;
+        }
+
+        public boolean isPlayerExecutor() {
+            return this == PLAYER || this == PROXY_PLAYER;
+        }
+
+        public static CommandExecutor fromString(Object value, CommandExecutor fallback) {
+            if (value == null) return fallback;
+            String raw = value.toString().trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
+            return switch (raw) {
+                case "player", "viewer", "as_player", "player_default" -> PLAYER;
+                case "proxy", "proxy_player", "proxy:player", "proxy_player_default" -> PROXY_PLAYER;
+                case "proxy_console", "proxy:console", "proxyconsole" -> PROXY_CONSOLE;
+                case "console", "server", "as_console", "console_default" -> CONSOLE;
+                default -> fallback;
+            };
+        }
+    }
+
     public static final class ButtonSegment implements Segment {
         public final String display;
         public final String hover;
         public final List<String> commands;
+        @Deprecated(forRemoval = false)
         public final boolean defaultAsPlayer;
+        public final CommandExecutor defaultExecutor;
         public final boolean appendSpace;
         public final List<Notification> notifications;
         private final PapiContext context;
 
         public ButtonSegment(String display, String hover, List<String> commands,
-                             boolean defaultAsPlayer, boolean appendSpace,
+                             CommandExecutor defaultExecutor, boolean appendSpace,
                              List<Notification> notifications, PapiContext context) {
             this.display = display == null ? "" : display;
             this.hover = hover == null ? "" : hover;
             this.commands = commands == null ? List.of() : List.copyOf(commands);
-            this.defaultAsPlayer = defaultAsPlayer;
+            if (defaultExecutor == null) {
+                defaultExecutor = CommandExecutor.CONSOLE;
+            }
+            this.defaultExecutor = defaultExecutor;
+            this.defaultAsPlayer = defaultExecutor.isPlayerExecutor();
             this.appendSpace = appendSpace;
             this.notifications = notifications == null ? List.of() : List.copyOf(notifications);
             this.context = context == null ? PapiContext.VIEWER : context;

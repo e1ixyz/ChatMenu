@@ -4,7 +4,7 @@
 #   text         -> label shown in chat (optional formatting codes)
 #   hover        -> tooltip (string or list of strings, joined with newlines)
 #   commands     -> string or list; ";" also chains commands inside a string
-#   run-as       -> player | console (defaults to console)
+#   run-as       -> player | console | proxy-player | proxy-console (defaults to console)
 #   context      -> viewer | target (PlaceholderAPI context for text/hover)
 #   append-space -> true to append a trailing space after the button
 # Placeholders:
@@ -12,6 +12,8 @@
 #   %target% -> the selected target (self menus fall back to %player%)
 
 commands:
+
+
 
   prefix:
     permission: chatmenu.prefix
@@ -21,105 +23,119 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&2[Dark Green]'
+              text: '&2[Dark Green] '
               hover: '&aSelect Dark Green'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &2'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&a[Green]'
+              text: '&a[Green] '
               hover: '&aSelect Green'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &a'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&e[Yellow]'
+              text: '&e[Yellow] '
               hover: '&aSelect Yellow'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &e'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&6[Orange]'
+              text: '&6[Orange] '
               hover: '&aSelect Orange'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &6'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&c[Red]'
+              text: '&c[Red] '
               hover: '&aSelect Red'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &c'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&9[Blue]'
+              text: '&9[Blue] '
               hover: '&aSelect Blue'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &9'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&5[Purple]'
+              text: '&5[Purple] '
               hover: '&aSelect Purple'
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta addprefix 2 &5'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
       - text: ''
       - line:
           - button:
-              text: '&d[✿]'
+              text: '&d[✿] '
               hover: '&dBloom with this symbol'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&d✿ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&c[❤]'
+              text: '&c[❤] '
               hover: '&cShow your love'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&c❤ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&f[♬]'
+              text: '&f[♬] '
               hover: '&fMusical vibes'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&f♬ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&e[✦]'
+              text: '&e[✦] '
               hover: '&eShine bright'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&e✦ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&6[✯]'
+              text: '&6[✯] '
               hover: '&6Add sparkle'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&6✯ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&9[☄]'
+              text: '&9[☄] '
               hover: '&9Cosmic style'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&9☄ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
           - button:
-              text: '&a[☀]'
+              text: '&a[☀] '
               hover: '&aSunny mood'
               commands:
                 - 'lp user %player% meta removeprefix 3'
                 - 'lp user %player% meta addprefix 3 "&a☀ &r"'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
       - text: ''
       - line:
           - button:
@@ -128,35 +144,52 @@ commands:
               commands:
                 - 'lp user %player% meta removeprefix 2'
                 - 'lp user %player% meta removeprefix 3'
-                - 'msg %player% &aSetting updated'
+              notify:
+                viewer: '&aSetting updated'
+
+
+
 
   punish:
     permission: chatmenu.punish
     type: target
     message:
-      - text: '{{ctx=target}} &eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+      - text: '&eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+        context: target
       - text: ''
       - line:
           - button:
-              text: '&e[Warn]'
-              hover: '&7Send a warning to %target% to follow the rules'
-              commands:
-                - 'msg %target% Please follow the rules or you will be muted or banned for 1 hour'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              text: '&e[Send Warning] '
+              hover: '&eSend a warning to %target%'
+              commands: []
+              notify:
+                target: 'Please follow the rules or you will be muted or banned permanently'
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&6[Mute]'
-              hover: '&eMute %target% for 1 hour'
+              text: '&e[Kick] '
+              hover: '&eKick %target%'
+              commands:
+                - 'kick %target%'
+              notify:
+                viewer: '&fPunishment Issued'
+      - text: ''
+      - line:
+          - button:
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 hour'
               commands:
                 - 'mute %target% 1h'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&c[Ban]'
+              text: '&c[Ban] '
               hover: '&cBan %target% for 1 hour'
               commands:
                 - 'ban %target% 1h'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&4[IP-Ban]'
+              text: '&4[IP-Ban] '
               hover: '&4IP-Ban %target% for 1 hour'
               commands:
                 - 'banip %target% 1h'
@@ -164,25 +197,21 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&e[Warn]'
-              hover: '&7Send a warning to %target%'
-              commands:
-                - 'msg %target% Please follow the rules or you will be muted or banned for 1 day'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
-          - button:
-              text: '&6[Mute]'
-              hover: '&eMute %target% for 1 day'
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 day'
               commands:
                 - 'mute %target% 1d'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&c[Ban]'
+              text: '&c[Ban] '
               hover: '&cBan %target% for 1 day'
               commands:
                 - 'ban %target% 1d'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&4[IP-Ban]'
+              text: '&4[IP-Ban] '
               hover: '&4IP-Ban %target% for 1 day'
               commands:
                 - 'banip %target% 1d'
@@ -190,25 +219,21 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&e[Warn]'
-              hover: '&7Send a warning to %target%'
-              commands:
-                - 'msg %target% Please follow the rules or you will be muted or banned for 1 week'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
-          - button:
-              text: '&6[Mute]'
-              hover: '&eMute %target% for 1 week'
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 week'
               commands:
                 - 'mute %target% 1w'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&c[Ban]'
+              text: '&c[Ban] '
               hover: '&cBan %target% for 1 week'
               commands:
                 - 'ban %target% 1w'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&4[IP-Ban]'
+              text: '&4[IP-Ban] '
               hover: '&4IP-Ban %target% for 1 week'
               commands:
                 - 'banip %target% 1w'
@@ -216,25 +241,21 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&e[Warn]'
-              hover: '&7Send a warning to %target%'
-              commands:
-                - 'msg %target% Please follow the rules or you will be muted or banned permanently'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
-          - button:
-              text: '&6[Mute]'
-              hover: '&eMute %target% permanently'
+              text: '&6[Mute] '
+              hover: '&6Mute %target% permanently'
               commands:
                 - 'mute %target%'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&c[Ban]'
+              text: '&c[Ban] '
               hover: '&cBan %target% permanently'
               commands:
                 - 'ban %target%'
-                - 'player:/tellraw @s {"text":"Punishment Issued","color":"white"}'
+              notify:
+                viewer: '&fPunishment Issued'
           - button:
-              text: '&4[IP-Ban]'
+              text: '&4[IP-Ban] '
               hover: '&4IP-Ban %target% permanently'
               commands:
                 - 'banip %target%'
@@ -242,55 +263,60 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&a[Info]'
+              text: '&a[Info] '
               hover: '&aView info on %target%'
               commands:
                 - 'player:/whois %target%'
           - button:
-              text: '&a[Banlist]'
+              text: '&a[Banlist] '
               hover: '&aView banlist'
               commands:
                 - 'player:/banlist'
           - button:
-              text: '&a[Un-Mute]'
-              hover: '&2Un-Mute %target%'
+              text: '&a[Un-Mute] '
+              hover: '&aUn-Mute %target%'
               commands:
                 - 'mute %target%'
-                - 'player:/tellraw @s {"text":"Punishment Revoked","color":"white"}'
+              notify:
+                viewer: '&fPunishment Revoked'
           - button:
-              text: '&a[Un-Ban]'
-              hover: '&2Un-Ban %target%'
+              text: '&a[Un-Ban] '
+              hover: '&aUn-Ban %target%'
               commands:
                 - 'pardon %target%'
-                - 'player:/tellraw @s {"text":"Punishment Revoked","color":"white"}'
+              notify:
+                viewer: '&fPunishment Revoked'
           - button:
-              text: '&a[Un-IP-Ban]'
-              hover: '&2Un-IP-Ban %target%'
+              text: '&a[Un-IP-Ban] '
+              hover: '&aUn-IP-Ban %target%'
               commands:
                 - 'pardonip %target%'
-                - 'player:/tellraw @s {"text":"Punishment Revoked","color":"white"}'
+              notify:
+                viewer: '&fPunishment Revoked'
       - line:
           - button:
-              text: '&2[Vanish & TP]'
-              hover: '&aVanish and teleport to %target%'
+              text: '&2[Vanish & TP] '
+              hover: '&2Vanish and teleport to %target%'
               commands:
                 - 'v %player%'
                 - 'tp %player% %target%'
           - button:
-              text: '&2[Check Alts]'
-              hover: '&aCheck alts of %target%'
+              text: '&2[Check Alts] '
+              hover: '&2Check alts of %target%'
               commands:
-                - 'player:/seen %target%'
+                - 'player:/alts %target%'
           - button:
-              text: '&2[View Inventory]'
-              hover: '&aView inventory of %target%'
+              text: '&2[View Inventory] '
+              hover: '&2View inventory of %target%'
               commands:
                 - 'player:/invsee %target%'
           - button:
-              text: '&2[View Enderchest]'
-              hover: '&aView enderchest of %target%'
+              text: '&2[View Enderchest] '
+              hover: '&2View enderchest of %target%'
               commands:
                 - 'player:/ec %target%'
+
+
 
   settings:
     permission: chatmenu.settings
@@ -300,37 +326,37 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&a[Coords]'
+              text: '&a[Coords] '
               hover: '&aOpen coords HUD (can block other action bar messages)'
               commands:
                 - 'player:/coords'
           - button:
-              text: '&a[Prefix]'
+              text: '&a[Prefix] '
               hover: '&aOpen prefix menu'
               commands:
                 - 'player:/prefix'
           - button:
-              text: '&a[Map]'
+              text: '&a[Map] '
               hover: '&aGet link to server map'
               commands:
                 - 'player:/map'
           - button:
-              text: '&a[Reports]'
+              text: '&a[Reports] '
               hover: '&aSee instructions for player/bug reports'
               commands:
-                - 'player:/report'
+                - 'proxy:/report'
           - button:
-              text: '&a[Glow]'
+              text: '&a[Glow] '
               hover: '&aToggle Glowing Effect'
               commands:
                 - 'player:/glow'
           - button:
-              text: '&a[Discord]'
+              text: '&a[Discord] '
               hover: '&aLink Discord account'
               commands:
                 - 'player:/discordsettings'
           - button:
-              text: '&a[Ignore]'
+              text: '&a[Ignore] '
               hover: '&aIgnore Player'
               commands:
                 - 'player:/ignore'
@@ -341,7 +367,7 @@ commands:
     message:
       - line:
           - button:
-              text: '&a[Discord Link]'
+              text: '&a[Discord Link] '
               hover: '&aLink Discord Account'
               commands:
                 - 'player:/discord link'
@@ -359,7 +385,7 @@ commands:
       - text: ''
       - line:
           - button:
-              text: '&a[Show on Map]'
+              text: '&a[Show on Map] '
               hover: '&aShow on Dynmap'
               commands:
                 - 'player:/dynmap show'
@@ -387,38 +413,39 @@ commands:
     message:
       - text: '&4Manage Menu'
       - text: ''
-      - text: '{{ctx=target}} &eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+      - text: '&eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+        context: target
       - text: ''
       - line:
           - button:
-              text: '&c[Restart]'
+              text: '&c[Restart] '
               hover: '&cRestart the server'
               commands:
                 - 'restart'
           - button:
-              text: '&c[Maintenance]'
+              text: '&c[Maintenance] '
               hover: '&cEnable maintenance mode'
               commands:
                 - 'maintenance on'
           - button:
-              text: '&c[Server Diagnostics]'
+              text: '&c[Server Diagnostics] '
               hover: '&cCheck server diagnostics'
               commands:
                 - 'player:/lag'
       - line:
           - button:
-              text: '&4[Rollback Menu]'
+              text: '&4[Rollback Menu] '
               hover: '&4Inventory rollback of %target%'
               commands:
                 - 'player:/irp restore %target%'
           - button:
-              text: '&4[Rank Menu]'
+              text: '&4[Rank Menu] '
               hover: '&4Manage rank of %target%'
               commands:
                 - 'player:/rank %target%'
           - button:
-              text: '&4[TP All]'
-              hover: '&4Teleport all users to %player%'
+              text: '&4[TP All] '
+              hover: '&4Teleport all users to %target%'
               commands:
                 - 'tpall %player%'
       - text: ''
@@ -429,23 +456,26 @@ commands:
               commands:
                 - 'give * cookie 1'
 
+
   rank:
     permission: chatmenu.rank
     type: target
     message:
       - text: '&4Rank Menu'
       - text: ''
-      - text: '{{ctx=target}} &eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+      - text: '&eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+        context: target
       - text: ''
       - line:
           - button:
-              text: '&a[Promote User]'
+              text: '&a[Promote User] '
               hover: '&aPromote user to %luckperms_next_group_on_track_main%'
               commands:
                 - 'console:lp user %target% promote'
                 - 'player:/rank %target%'
-                - 'console:msg %target% &aYou have been promoted'
-                - 'player:/tellraw @s {"text":"Operation completed","color":"white"}'
+              notify:
+                target: '&aYou have been promoted'
+                viewer: '&fOperation completed'
               context: target
           - button:
               text: '&c[Demote User]'
@@ -453,7 +483,7 @@ commands:
               commands:
                 - 'console:lp user %target% demote'
                 - 'player:/rank %target%'
-                - 'console:msg %target% &cYou have been demoted'
-                - 'player:/tellraw @s {"text":"Operation completed","color":"white"}'
+              notify:
+                target: '&cYou have been demoted'
+                viewer: '&fOperation completed'
               context: target
-

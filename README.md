@@ -6,7 +6,7 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 - **Dynamic commands** – every child under `commands:` becomes `/yourcommand` at runtime, with optional self/target modes and tab-complete for target menus.
 - **Structured YAML menus** – compose lines from `text` and `button` segments so large inline menus stay readable. Legacy bracket syntax (`[display|commands|hover]`) still works for existing configs.
 - **Inline notifications** – add `notify.viewer` / `notify.target` to a button to send feedback without padding the config with `/tellraw`.
-- **Console or player execution** – choose executors per button (`run-as: player`) or per command (`player:/cmd`). `%player%` and `%target%` placeholders are substituted at runtime.
+- **Console, player, or proxy execution** – choose executors per button (`run-as: player`, `run-as: proxy-player`) or per command (`player:/cmd`, `proxy:/cmd`). `%player%` and `%target%` placeholders are substituted at runtime.
 - **PlaceholderAPI aware** – render text/hover with viewer or target context (`context: target`). Offline lookups are attempted when needed.
 - **Reload safe** – `/chatmenu reload` re-parses config, registers new commands, and retires old ones without a server restart.
 
@@ -56,7 +56,7 @@ commands:
   - `text`: label shown in chat.
   - `hover`: tooltip; accepts a string or list of strings (joined with newlines).
   - `commands`: string or list. Strings can include `;` to sequence actions. You may also use objects such as `{player: "msg %player% hi"}` or `{command: "op %player%", run-as: console}`.
-  - `run-as`: optional default executor for commands without a prefix (`player | console`).
+  - `run-as`: optional default executor for commands without a prefix (`player | console | proxy-player | proxy-console`).
   - `notify`: string/map/list; use keys like `viewer:` / `target:` (or `notify-viewer`, `notify-target`) to have the plugin message players once the button completes.
   - `append-space`: add a trailing space after the button (default `false`; legacy lines keep the old behaviour).
   - `context`: choose PlaceholderAPI context per segment (`viewer | target`); defaults to the surrounding line.
@@ -80,6 +80,11 @@ Lines can be expressed in block or flow style, letting you keep dense inline men
 ### Legacy Bracket Syntax
 Existing configs using `[Display | command1; command2 | Hover | flags]` continue to load. Flags support `as=player` and `ctx=viewer|target`. You can mix legacy strings with the new structure per line during migration.
 
+### Proxy Commands
+- Prefix any action with `proxy:` / `proxy-console:` or set `run-as: proxy-player` / `run-as: proxy-console` to execute through your network proxy.
+- Install the lightweight bridge found in `proxy/` on your BungeeCord/Waterfall proxy (build with `mvn package -f proxy/pom.xml` and drop the jar into the proxy's `plugins` folder).
+- Commands are delivered via plugin messaging, so the initiating player must remain online until the click executes.
+
 ## Example Menus
 
 The default `config.yml` ships with:
@@ -99,6 +104,7 @@ Both illustrate inline lists without unreadable escape soup.
 
 ## Troubleshooting
 - **Nothing happens on click** – ensure your button has at least one command. Remember to include `run-as: player` or prefix `player:` if the command needs player context.
+- **Proxy command ignored** – confirm the `ChatMenuProxy` bridge is installed on your proxy and that you used the `proxy:` prefix or `run-as: proxy-player`.
 - **Viewer placeholders show for target buttons** – add `context: target` on the button or line, and verify the PlaceholderAPI expansion supports target players.
 - **Spaces disappear between buttons** – add small `text` segments such as `{text: ", "}` or set `append-space: true` on the buttons you want spaced automatically.
 
