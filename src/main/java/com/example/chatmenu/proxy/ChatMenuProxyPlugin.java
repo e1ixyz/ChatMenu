@@ -39,6 +39,10 @@ public final class ChatMenuProxyPlugin {
     @Subscribe
     public void onInitialize(ProxyInitializeEvent event) {
         proxy.getChannelRegistrar().register(CHANNEL);
+        proxy.getPluginManager().fromInstance(this).ifPresentOrElse(
+                container -> proxy.getEventManager().register(container, this),
+                () -> logger.warning("Unable to register ChatMenu proxy listener: container lookup failed.")
+        );
         logger.info("ChatMenu proxy bridge enabled (Velocity).");
     }
 

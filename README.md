@@ -14,13 +14,14 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 - Paper/Spigot 1.20+ (tested on 1.21)
 - Java 17+
 - Optional: [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) for `%placeholders%`
-- Optional: Velocity 3.3+ proxy with the `ChatMenuProxy` add-on for forwarding commands
+- Optional: Velocity 3.3+ proxy (drop the same jar into the proxy’s `plugins/` folder to enable forwarding)
 
 ## Installation
 1. Drop the jar in `plugins/`.
 2. Start the server once to generate `plugins/ChatMenu/config.yml`.
 3. Edit the config (single-quote strings to keep `&` and `[` intact).
 4. Use `/chatmenu reload` in game or console to apply changes.
+5. (Velocity only) Copy the same jar to your Velocity proxy’s `plugins/` folder and restart the proxy to enable proxy forwarding.
 
 ## Configuration Overview
 
@@ -83,7 +84,7 @@ Existing configs using `[Display | command1; command2 | Hover | flags]` continue
 
 ### Proxy Commands
 - Prefix any action with `proxy:` / `proxy-console:` or set `run-as: proxy-player` / `run-as: proxy-console` to execute through your network proxy.
-- Install the lightweight bridge found in `proxy/` on your Velocity proxy (build with `mvn package -f proxy/pom.xml` and drop the jar into the proxy's `plugins` folder).
+- Drop the same ChatMenu jar into your Velocity proxy’s `plugins/` folder to enable the built-in bridge.
 - BungeeCord/Waterfall is not supported by this bridge; use Velocity when you need proxy execution.
 - Commands are delivered via plugin messaging, so the initiating player must remain online until the click executes.
 
@@ -106,7 +107,7 @@ Both illustrate inline lists without unreadable escape soup.
 
 ## Troubleshooting
 - **Nothing happens on click** – ensure your button has at least one command. Remember to include `run-as: player` or prefix `player:` if the command needs player context.
-- **Proxy command ignored** – confirm the `ChatMenuProxy` bridge is installed on your proxy and that you used the `proxy:` prefix or `run-as: proxy-player`.
+- **Proxy command ignored** – confirm the ChatMenu jar is also present on your Velocity proxy and that you used the `proxy:` prefix or `run-as: proxy-player`.
 - **Viewer placeholders show for target buttons** – add `context: target` on the button or line, and verify the PlaceholderAPI expansion supports target players.
 - **Spaces disappear between buttons** – add small `text` segments such as `{text: ", "}` or set `append-space: true` on the buttons you want spaced automatically.
 
