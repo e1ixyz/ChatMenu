@@ -7,6 +7,7 @@ import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
@@ -29,17 +30,19 @@ public final class ChatMenuProxyPlugin {
 
     private final ProxyServer proxy;
     private final Logger logger;
+    private final PluginContainer container;
 
     @Inject
-    public ChatMenuProxyPlugin(ProxyServer proxy, Logger logger) {
+    public ChatMenuProxyPlugin(ProxyServer proxy, Logger logger, PluginContainer container) {
         this.proxy = proxy;
         this.logger = logger;
+        this.container = container;
+        this.proxy.getEventManager().register(container, this);
     }
 
     @Subscribe
     public void onInitialize(ProxyInitializeEvent event) {
         proxy.getChannelRegistrar().register(CHANNEL);
-        proxy.getEventManager().register(this, this);
         logger.info("ChatMenu proxy bridge enabled (Velocity).");
     }
 
