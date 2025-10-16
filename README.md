@@ -14,6 +14,7 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 - Paper/Spigot 1.20+ (tested on 1.21)
 - Java 17+
 - Optional: [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) for `%placeholders%`
+- Optional: Velocity 3.3+ proxy with the `ChatMenuProxy` add-on for forwarding commands
 
 ## Installation
 1. Drop the jar in `plugins/`.
@@ -82,7 +83,8 @@ Existing configs using `[Display | command1; command2 | Hover | flags]` continue
 
 ### Proxy Commands
 - Prefix any action with `proxy:` / `proxy-console:` or set `run-as: proxy-player` / `run-as: proxy-console` to execute through your network proxy.
-- Install the lightweight bridge found in `proxy/` on your BungeeCord/Waterfall proxy (build with `mvn package -f proxy/pom.xml` and drop the jar into the proxy's `plugins` folder).
+- Install the lightweight bridge found in `proxy/` on your Velocity proxy (build with `mvn package -f proxy/pom.xml` and drop the jar into the proxy's `plugins` folder).
+- BungeeCord/Waterfall is not supported by this bridge; use Velocity when you need proxy execution.
 - Commands are delivered via plugin messaging, so the initiating player must remain online until the click executes.
 
 ## Example Menus

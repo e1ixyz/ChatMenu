@@ -1,0 +1,7 @@
+{
+  "id": "chatmenuproxy",
+  "name": "ChatMenuProxy",
+  "version": "1.0.0",
+  "authors": ["ChatMenu"],
+  "main": "com.example.chatmenu.proxy.ChatMenuProxyPlugin"
+}

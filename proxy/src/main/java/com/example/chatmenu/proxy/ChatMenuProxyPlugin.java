@@ -2,56 +2,71 @@ package com.example.chatmenu.proxy;
 
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteStreams;
-import net.md_5.bungee.api.ProxyServer;
-import net.md_5.bungee.api.connection.ProxiedPlayer;
-import net.md_5.bungee.api.connection.Server;
-import net.md_5.bungee.api.plugin.Listener;
-import net.md_5.bungee.api.plugin.Plugin;
-import net.md_5.bungee.api.plugin.PluginManager;
-import net.md_5.bungee.event.EventHandler;
-import net.md_5.bungee.api.event.PluginMessageEvent;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.connection.PluginMessageEvent;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
+import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.proxy.Player;
+import com.velocitypowered.api.proxy.ProxyServer;
+import com.velocitypowered.api.proxy.ServerConnection;
+import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+import jakarta.inject.Inject;
 
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public final class ChatMenuProxyPlugin extends Plugin implements Listener {
+@Plugin(
+        id = "chatmenuproxy",
+        name = "ChatMenuProxy",
+        version = "1.0.0",
+        authors = {"ChatMenu"}
+)
+public final class ChatMenuProxyPlugin {
 
-    private static final String CHANNEL = "chatmenu:proxy";
+    private static final MinecraftChannelIdentifier CHANNEL = MinecraftChannelIdentifier.from("chatmenu:proxy");
 
-    @Override
-    public void onEnable() {
-        ProxyServer proxy = getProxy();
-        proxy.registerChannel(CHANNEL);
-        PluginManager manager = proxy.getPluginManager();
-        manager.registerListener(this, this);
-        getLogger().info("ChatMenu proxy bridge enabled.");
+    private final ProxyServer proxy;
+    private final Logger logger;
+
+    @Inject
+    public ChatMenuProxyPlugin(ProxyServer proxy, Logger logger) {
+        this.proxy = proxy;
+        this.logger = logger;
+        proxy.getEventManager().register(this, this);
     }
 
-    @Override
-    public void onDisable() {
-        PluginManager manager = getProxy().getPluginManager();
-        manager.unregisterListener(this);
-        getProxy().unregisterChannel(CHANNEL);
+    @Subscribe
+    public void onInitialize(ProxyInitializeEvent event) {
+        proxy.getChannelRegistrar().register(CHANNEL);
+        logger.info("ChatMenu proxy bridge enabled (Velocity).");
     }
 
-    @EventHandler
-    public void onPluginMessage(PluginMessageEvent event) {
-        if (!CHANNEL.equalsIgnoreCase(event.getTag())) {
+    @Subscribe
+    public void onShutdown(ProxyShutdownEvent event) {
+        proxy.getChannelRegistrar().unregister(CHANNEL);
+    }
+
+    @Subscribe
+    public void handlePluginMessage(PluginMessageEvent event) {
+        if (!event.getIdentifier().equals(CHANNEL)) {
             return;
         }
 
-        if (!(event.getSender() instanceof Server)) {
-            getLogger().warning("Blocked proxy command payload from non-server sender: " + event.getSender().getClass().getName());
+        if (!(event.getSource() instanceof ServerConnection)) {
+            event.setResult(PluginMessageEvent.ForwardResult.handled());
+            logger.warning("Blocked proxy command payload from non-server sender: " + event.getSource().getClass().getName());
             return;
         }
 
-        if (!(event.getReceiver() instanceof ProxiedPlayer receiver)) {
-            getLogger().warning("Blocked proxy command payload with non-player receiver.");
+        if (!(event.getTarget() instanceof Player player)) {
+            event.setResult(PluginMessageEvent.ForwardResult.handled());
+            logger.warning("Blocked proxy command payload with non-player target.");
             return;
         }
 
-        // Prevent forwarding to other servers.
-        event.setCancelled(true);
+        event.setResult(PluginMessageEvent.ForwardResult.handled());
 
         byte[] data = event.getData();
         if (data == null || data.length == 0) {
@@ -64,37 +79,29 @@ public final class ChatMenuProxyPlugin extends Plugin implements Listener {
         String viewerName = readUtfSafe(in);
         String command = trimLeadingSlash(readUtfSafe(in));
 
-        if (viewerId != null && !viewerId.equals(receiver.getUniqueId())) {
-            getLogger().warning("Ignoring proxy command payload due to UUID mismatch for player " + receiver.getName());
+        if (viewerId != null && !viewerId.equals(player.getUniqueId())) {
+            logger.warning("Ignoring proxy command payload due to UUID mismatch for player " + player.getUsername());
             return;
         }
-        if (viewerName != null && !viewerName.isEmpty() && !viewerName.equalsIgnoreCase(receiver.getName())) {
-            getLogger().warning("Ignoring proxy command payload due to name mismatch for player " + receiver.getName());
+        if (viewerName != null && !viewerName.isEmpty() && !viewerName.equalsIgnoreCase(player.getUsername())) {
+            logger.warning("Ignoring proxy command payload due to name mismatch for player " + player.getUsername());
             return;
         }
-
         if (command.isEmpty()) {
             return;
         }
 
         try {
-            dispatch(executor, receiver, command);
+            dispatch(executor, player, command);
         } catch (Exception ex) {
-            getLogger().log(Level.WARNING, "Unable to run proxy command '" + command + "': " + ex.getMessage(), ex);
+            logger.log(Level.WARNING, "Unable to run proxy command '" + command + "': " + ex.getMessage(), ex);
         }
     }
 
-    private void dispatch(ProxyExecutor executor, ProxiedPlayer viewer, String command) {
-        ProxyServer proxy = getProxy();
+    private void dispatch(ProxyExecutor executor, Player player, String command) {
         switch (executor) {
-            case PLAYER -> {
-                if (viewer == null || !viewer.isConnected()) {
-                    getLogger().warning("Proxy command skipped because player connection is unavailable.");
-                    return;
-                }
-                proxy.getPluginManager().dispatchCommand(viewer, command);
-            }
-            case CONSOLE -> proxy.getPluginManager().dispatchCommand(proxy.getConsole(), command);
+            case PLAYER -> proxy.getCommandManager().executeAsync(player, command);
+            case CONSOLE -> proxy.getCommandManager().executeAsync(proxy.getConsoleCommandSource(), command);
         }
     }
 
