@@ -34,12 +34,12 @@ public final class ChatMenuProxyPlugin {
     public ChatMenuProxyPlugin(ProxyServer proxy, Logger logger) {
         this.proxy = proxy;
         this.logger = logger;
-        proxy.getEventManager().register(this, this);
     }
 
     @Subscribe
     public void onInitialize(ProxyInitializeEvent event) {
         proxy.getChannelRegistrar().register(CHANNEL);
+        proxy.getEventManager().register(this, this);
         logger.info("ChatMenu proxy bridge enabled (Velocity).");
     }
 
