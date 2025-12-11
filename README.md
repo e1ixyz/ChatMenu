@@ -6,6 +6,7 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 - **Dynamic commands** – every child under `commands:` becomes `/yourcommand` at runtime, with optional self/target modes and tab-complete for target menus.
 - **Structured YAML menus** – compose lines from `text` and `button` segments so large inline menus stay readable. Legacy bracket syntax (`[display|commands|hover]`) still works for existing configs.
 - **Inline notifications** – add `notify.viewer` / `notify.target` to a button to send feedback without padding the config with `/tellraw`.
+- **Conditional content** – gate individual lines or buttons with a `permission:` so only players with that node see them.
 - **Console, player, or proxy execution** – choose executors per button (`run-as: player`, `run-as: proxy-player`) or per command (`player:/cmd`, `proxy:/cmd`). `%player%` and `%target%` placeholders are substituted at runtime.
 - **PlaceholderAPI aware** – render text/hover with viewer or target context (`context: target`). Offline lookups are attempted when needed.
 - **Reload safe** – `/chatmenu reload` re-parses config, registers new commands, and retires old ones without a server restart.
@@ -61,6 +62,7 @@ commands:
   - `run-as`: optional default executor for commands without a prefix (`player | console | proxy-player | proxy-console`).
   - `notify`: string/map/list; use keys like `viewer:` / `target:` (or `notify-viewer`, `notify-target`) to have the plugin message players once the button completes.
   - `append-space`: add a trailing space after the button (default `false`; legacy lines keep the old behaviour).
+  - `permission`: hide this button when the viewer lacks the node. You can also place `permission:` alongside any `message` entry (such as a `line` or `text`) to hide the entire row.
   - `context`: choose PlaceholderAPI context per segment (`viewer | target`); defaults to the surrounding line.
 
 Lines can be expressed in block or flow style, letting you keep dense inline menus readable:
@@ -71,6 +73,27 @@ Lines can be expressed in block or flow style, letting you keep dense inline men
       {button: {text: "&aAccept", hover: "&7Confirm action", commands: ["confirm"], run-as: player}},
       {text: "&7] "}
     ]
+```
+
+### Conditional Content
+Add `permission:` to a message entry or button to only show it to players with that node:
+
+```yaml
+  settings:
+    permission: chatmenu.settings
+    type: self
+    message:
+      - text: "&fSettings for: %player%"
+      - line:
+          - button:
+              text: "&a[Coords]"
+              commands: ["player:/coords"]
+      - permission: chatmenu.vipsettings
+        line:
+          - button:
+              text: "&6[VIP Settings]"
+              hover: "&6Settings for users with the VIP rank"
+              commands: ["player:/vipsettings"]
 ```
 
 ### Context & Placeholders

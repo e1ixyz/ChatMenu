@@ -108,11 +108,14 @@ public class ChatMenu extends JavaPlugin {
                 if (line != null) lines.add(line);
             }
         } else if (rawMessage instanceof ConfigurationSection section) {
-            lines.add(parseStructuredLine(section.get("line"), CommandConfig.PapiContext.fromString(section.get("context"), CommandConfig.PapiContext.VIEWER), type));
+            String permission = parsePermission(section.get("permission"));
+            lines.add(parseStructuredLine(section.get("line"),
+                    CommandConfig.PapiContext.fromString(section.get("context"), CommandConfig.PapiContext.VIEWER),
+                    type, permission));
         } else if (rawMessage instanceof String str) {
-            lines.add(parseLegacyLine(str));
+            lines.add(parseLegacyLine(str, ""));
         } else if (rawMessage != null) {
-            lines.add(parseLegacyLine(String.valueOf(rawMessage)));
+            lines.add(parseLegacyLine(String.valueOf(rawMessage), ""));
         }
         return lines;
     }
@@ -122,7 +125,7 @@ public class ChatMenu extends JavaPlugin {
             return new CommandConfig.Line(List.of());
         }
         if (entry instanceof String str) {
-            return parseLegacyLine(str);
+            return parseLegacyLine(str, "");
         }
         if (entry instanceof ConfigurationSection section) {
             return parseMessageEntry(section.getValues(false), type);
@@ -131,44 +134,51 @@ public class ChatMenu extends JavaPlugin {
             return parseMapLine(rawMap, type);
         }
         if (entry instanceof List<?> list) {
-            return parseStructuredLine(list, CommandConfig.PapiContext.VIEWER, type);
+            return parseStructuredLine(list, CommandConfig.PapiContext.VIEWER, type, "");
         }
-        return parseLegacyLine(entry.toString());
+        return parseLegacyLine(entry.toString(), "");
     }
 
     private CommandConfig.Line parseMapLine(Map<?, ?> rawMap, CommandType type) {
         Map<String, Object> map = normalizeMap(rawMap);
         CommandConfig.PapiContext defaultCtx = CommandConfig.PapiContext.fromString(map.get("context"), CommandConfig.PapiContext.VIEWER);
+        String linePermission = parsePermission(map.get("permission"));
 
         if (map.containsKey("line")) {
-            return parseStructuredLine(map.get("line"), defaultCtx, type);
+            return parseStructuredLine(map.get("line"), defaultCtx, type, linePermission);
         }
         if (map.containsKey("segments")) {
-            return parseStructuredLine(map.get("segments"), defaultCtx, type);
+            return parseStructuredLine(map.get("segments"), defaultCtx, type, linePermission);
         }
         if (map.containsKey("raw")) {
-            return parseLegacyLine(String.valueOf(map.get("raw")));
+            return parseLegacyLine(String.valueOf(map.get("raw")), linePermission);
         }
         if (map.containsKey("text") && map.size() == 1) {
-            return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx)));
+            return new CommandConfig.Line(List.of(
+                    new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx, parsePermission(map.get("permission")))),
+                    linePermission);
         }
         if (map.containsKey("button")) {
-            CommandConfig.ButtonSegment button = parseButtonSegment(map, "button", defaultCtx, false);
-            return new CommandConfig.Line(List.of(button));
+            CommandConfig.ButtonSegment button = parseButtonSegment(map, "button", defaultCtx, false, linePermission);
+            return new CommandConfig.Line(List.of(button), linePermission);
         }
         if (looksLikeButton(map)) {
-            CommandConfig.ButtonSegment button = parseButtonSegment(map, null, defaultCtx, false);
-            return new CommandConfig.Line(List.of(button));
+            CommandConfig.ButtonSegment button = parseButtonSegment(map, null, defaultCtx, false, linePermission);
+            return new CommandConfig.Line(List.of(button), linePermission);
         }
         if (map.containsKey("text")) {
-            return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx)));
+            return new CommandConfig.Line(List.of(
+                    new CommandConfig.TextSegment(String.valueOf(map.get("text")), defaultCtx, parsePermission(map.get("permission")))),
+                    linePermission);
         }
-        return new CommandConfig.Line(List.of(new CommandConfig.TextSegment(map.toString(), defaultCtx)));
+        return new CommandConfig.Line(List.of(
+                new CommandConfig.TextSegment(map.toString(), defaultCtx, parsePermission(map.get("permission")))),
+                linePermission);
     }
 
-    private CommandConfig.Line parseStructuredLine(Object rawSegments, CommandConfig.PapiContext defaultCtx, CommandType type) {
+    private CommandConfig.Line parseStructuredLine(Object rawSegments, CommandConfig.PapiContext defaultCtx, CommandType type, String linePermission) {
         if (rawSegments == null) {
-            return new CommandConfig.Line(List.of());
+            return new CommandConfig.Line(List.of(), linePermission);
         }
 
         List<?> segmentList;
@@ -189,15 +199,15 @@ public class ChatMenu extends JavaPlugin {
             CommandConfig.Segment segment = parseSegment(segObj, defaultCtx, type);
             if (segment != null) segments.add(segment);
         }
-        return new CommandConfig.Line(segments);
+        return new CommandConfig.Line(segments, linePermission);
     }
 
     private CommandConfig.Segment parseSegment(Object raw, CommandConfig.PapiContext defaultCtx, CommandType type) {
         if (raw == null) {
-            return new CommandConfig.TextSegment("", defaultCtx);
+            return new CommandConfig.TextSegment("", defaultCtx, "");
         }
         if (raw instanceof String str) {
-            return new CommandConfig.TextSegment(str, defaultCtx);
+            return new CommandConfig.TextSegment(str, defaultCtx, "");
         }
         if (raw instanceof ConfigurationSection section) {
             return parseSegment(section.getValues(false), defaultCtx, type);
@@ -205,32 +215,34 @@ public class ChatMenu extends JavaPlugin {
         if (raw instanceof Map<?, ?> rawMap) {
             Map<String, Object> map = normalizeMap(rawMap);
             CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(map.get("context"), defaultCtx);
+            String permission = parsePermission(map.get("permission"));
 
             if (map.containsKey("text") && !looksLikeButton(map)) {
-                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx);
+                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx, permission);
             }
             if (map.containsKey("button")) {
-                return parseButtonSegment(map, "button", ctx, false);
+                return parseButtonSegment(map, "button", ctx, false, permission);
             }
             if (looksLikeButton(map)) {
-                return parseButtonSegment(map, null, ctx, false);
+                return parseButtonSegment(map, null, ctx, false, permission);
             }
             if (map.containsKey("text")) {
-                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx);
+                return new CommandConfig.TextSegment(String.valueOf(map.get("text")), ctx, permission);
             }
             if (map.containsKey("raw")) {
-                return new CommandConfig.TextSegment(String.valueOf(map.get("raw")), ctx);
+                return new CommandConfig.TextSegment(String.valueOf(map.get("raw")), ctx, permission);
             }
-            return new CommandConfig.TextSegment(map.toString(), ctx);
+            return new CommandConfig.TextSegment(map.toString(), ctx, permission);
         }
         if (raw instanceof List<?> list) {
-            return new CommandConfig.TextSegment(list.toString(), defaultCtx);
+            return new CommandConfig.TextSegment(list.toString(), defaultCtx, "");
         }
-        return new CommandConfig.TextSegment(raw.toString(), defaultCtx);
+        return new CommandConfig.TextSegment(raw.toString(), defaultCtx, "");
     }
 
     private CommandConfig.ButtonSegment parseButtonSegment(Map<String, Object> container, String nestedKey,
-                                                           CommandConfig.PapiContext inheritedCtx, boolean defaultAppendSpace) {
+                                                           CommandConfig.PapiContext inheritedCtx, boolean defaultAppendSpace,
+                                                           String inheritedPermission) {
         Map<String, Object> buttonSource = container;
         if (nestedKey != null) {
             buttonSource = normalizeMap(container.get(nestedKey));
@@ -253,7 +265,10 @@ public class ChatMenu extends JavaPlugin {
         CommandConfig.PapiContext ctx = CommandConfig.PapiContext.fromString(firstNonNull(buttonSource.get("context"), container.get("context")), inheritedCtx);
         List<CommandConfig.Notification> notifications = parseNotifications(buttonSource, container);
 
-        return new CommandConfig.ButtonSegment(display, hover, commands, defaultExecutor, appendSpace, notifications, ctx);
+        String permission = parsePermission(buttonSource.get("permission"));
+        if (permission.isEmpty()) permission = inheritedPermission == null ? "" : inheritedPermission;
+
+        return new CommandConfig.ButtonSegment(display, hover, commands, defaultExecutor, appendSpace, notifications, ctx, permission);
     }
 
     private boolean looksLikeButton(Map<String, Object> map) {
@@ -310,6 +325,12 @@ public class ChatMenu extends JavaPlugin {
         if (raw instanceof Boolean b) return b;
         String s = raw.toString().trim().toLowerCase(Locale.ROOT);
         return s.equals("true") || s.equals("yes") || s.equals("space") || s.equals("1");
+    }
+
+    private String parsePermission(Object raw) {
+        if (raw == null) return "";
+        String perm = raw.toString().trim();
+        return perm.isEmpty() ? "" : perm;
     }
 
     private List<String> parseCommandList(Object raw) {
@@ -439,6 +460,10 @@ public class ChatMenu extends JavaPlugin {
     }
 
     private CommandConfig.Line parseLegacyLine(String raw) {
+        return parseLegacyLine(raw, "");
+    }
+
+    private CommandConfig.Line parseLegacyLine(String raw, String permission) {
         LineCtx lc = extractLineContext(raw);
         String working = preprocessBrackets(lc.text);
         CommandConfig.PapiContext lineCtx = lc.ctx;
@@ -477,9 +502,9 @@ public class ChatMenu extends JavaPlugin {
                 CommandConfig.CommandExecutor legacyExecutor = defaultAsPlayer
                         ? CommandConfig.CommandExecutor.PLAYER
                         : CommandConfig.CommandExecutor.CONSOLE;
-                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, legacyExecutor, true, List.of(), btnCtx));
+                segments.add(new CommandConfig.ButtonSegment(displayRaw, hoverRaw, commands, legacyExecutor, true, List.of(), btnCtx, ""));
             } else {
-                segments.add(new CommandConfig.TextSegment(restoreBrackets("[" + segment + "]"), lineCtx));
+                segments.add(new CommandConfig.TextSegment(restoreBrackets("[" + segment + "]"), lineCtx, ""));
             }
 
             working = working.substring(end + 1);
@@ -487,12 +512,12 @@ public class ChatMenu extends JavaPlugin {
         }
 
         if (!working.isEmpty()) {
-            segments.add(new CommandConfig.TextSegment(restoreBrackets(working), lineCtx));
+                segments.add(new CommandConfig.TextSegment(restoreBrackets(working), lineCtx, ""));
         } else if (segments.isEmpty()) {
-            segments.add(new CommandConfig.TextSegment("", lineCtx));
+            segments.add(new CommandConfig.TextSegment("", lineCtx, ""));
         }
 
-        return new CommandConfig.Line(segments);
+        return new CommandConfig.Line(segments, permission);
     }
 
     private List<String> encodeCommands(CommandConfig.ButtonSegment button) {
@@ -708,11 +733,21 @@ public class ChatMenu extends JavaPlugin {
         return new LineCtx(s, ctx);
     }
 
+    private boolean hasPermission(Player viewer, String permission) {
+        if (permission == null || permission.isBlank()) return true;
+        return viewer.hasPermission(permission.trim());
+    }
+
     private void sendChatMenu(Player viewer, String targetName, CommandConfig cfg) {
         for (CommandConfig.Line line : cfg.lines) {
+            if (!hasPermission(viewer, line.permission)) continue;
+
             Component full = Component.empty();
+            boolean renderedSegment = false;
 
             for (CommandConfig.Segment segment : line.segments) {
+                if (!hasPermission(viewer, segment.permission())) continue;
+
                 CommandConfig.PapiContext ctx = segment.context();
 
                 if (segment instanceof CommandConfig.TextSegment textSeg) {
@@ -721,6 +756,7 @@ public class ChatMenu extends JavaPlugin {
                     } else {
                         full = full.append(Component.text(""));
                     }
+                    renderedSegment = true;
                     continue;
                 }
 
@@ -749,7 +785,15 @@ public class ChatMenu extends JavaPlugin {
                     if (button.appendSpace) {
                         full = full.append(Component.text(" "));
                     }
+                    renderedSegment = true;
                 }
+            }
+
+            if (!renderedSegment) {
+                if (line.segments.isEmpty()) {
+                    viewer.sendMessage(Component.empty());
+                }
+                continue;
             }
 
             viewer.sendMessage(full);

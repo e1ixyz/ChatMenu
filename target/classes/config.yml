@@ -8,6 +8,7 @@
 #   run-as      -> player | console | proxy-player | proxy-console (defaults to console)
 #   context     -> viewer | target   (PlaceholderAPI render context)
 #   append-space -> add a trailing space after the button (default false)
+#   permission  -> optional node required to show this entry (lines/message items accept this too)
 # Placeholders:
 #   %player% -> viewer name
 #   %target% -> selected target (self menus fall back to the viewer)

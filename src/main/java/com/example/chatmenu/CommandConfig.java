@@ -28,9 +28,15 @@ public class CommandConfig {
 
     public static final class Line {
         public final List<Segment> segments;
+        public final String permission;
 
         public Line(List<Segment> segments) {
+            this(segments, "");
+        }
+
+        public Line(List<Segment> segments, String permission) {
             this.segments = segments == null ? List.of() : List.copyOf(segments);
+            this.permission = permission == null ? "" : permission.trim();
         }
 
         public boolean isEmpty() {
@@ -40,20 +46,32 @@ public class CommandConfig {
 
     public interface Segment {
         PapiContext context();
+        String permission();
     }
 
     public static final class TextSegment implements Segment {
         public final String text;
+        private final String permission;
         private final PapiContext context;
 
         public TextSegment(String text, PapiContext context) {
+            this(text, context, "");
+        }
+
+        public TextSegment(String text, PapiContext context, String permission) {
             this.text = text == null ? "" : text;
             this.context = context == null ? PapiContext.VIEWER : context;
+            this.permission = permission == null ? "" : permission.trim();
         }
 
         @Override
         public PapiContext context() {
             return context;
+        }
+
+        @Override
+        public String permission() {
+            return permission;
         }
     }
 
@@ -93,11 +111,19 @@ public class CommandConfig {
         public final CommandExecutor defaultExecutor;
         public final boolean appendSpace;
         public final List<Notification> notifications;
+        public final String permission;
         private final PapiContext context;
 
         public ButtonSegment(String display, String hover, List<String> commands,
                              CommandExecutor defaultExecutor, boolean appendSpace,
                              List<Notification> notifications, PapiContext context) {
+            this(display, hover, commands, defaultExecutor, appendSpace, notifications, context, "");
+        }
+
+        public ButtonSegment(String display, String hover, List<String> commands,
+                             CommandExecutor defaultExecutor, boolean appendSpace,
+                             List<Notification> notifications, PapiContext context,
+                             String permission) {
             this.display = display == null ? "" : display;
             this.hover = hover == null ? "" : hover;
             this.commands = commands == null ? List.of() : List.copyOf(commands);
@@ -109,11 +135,17 @@ public class CommandConfig {
             this.appendSpace = appendSpace;
             this.notifications = notifications == null ? List.of() : List.copyOf(notifications);
             this.context = context == null ? PapiContext.VIEWER : context;
+            this.permission = permission == null ? "" : permission.trim();
         }
 
         @Override
         public PapiContext context() {
             return context;
+        }
+
+        @Override
+        public String permission() {
+            return permission;
         }
     }
 
