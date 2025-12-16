@@ -12,6 +12,7 @@
 # Placeholders:
 #   %player% -> viewer name
 #   %target% -> selected target (self menus fall back to the viewer)
+#   %context% (alias: %reason%, %content%) -> extra text passed after the command (e.g. reason)
 
 commands:
 
@@ -148,29 +149,138 @@ commands:
     permission: chatmenu.punish
     type: target
     message:
-      - text: "&cPunish Menu"
-      - text: "&7Targeting: &f%target%"
+      - text: '&eTargeting: &c%target%&e in group(s): &e%luckperms_inherited_groups%'
+        context: target
+      - text: ''
       - line:
           - button:
-              text: "&eWarn"
-              hover: "&7Send a warning"
-              commands: ["warn %target%"]
-              run-as: console
-              append-space: false
-              notify:
-                viewer: "&fPunishment issued"
-          - text: " "
+              text: '&e[Send Warning] '
+              hover: '&eSend a warning to %target%'
+              commands:
+                - 'warn %target% %context%'
           - button:
-              text: "&6Mute"
-              hover: "&eMute player"
-              commands: ["mute %target%"]
-              run-as: console
-              append-space: false
-              notify:
-                viewer: "&fPunishment issued"
-          - text: " "
+              text: '&e[Kick] '
+              hover: '&eKick %target%'
+              commands:
+                - 'kick %target% %context%'
+      - text: ''
+      - line:
           - button:
-              text: "&cBan"
-              hover: "&cBan player"
-              commands: ["ban %target%"]
-              run-as: console
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 hour'
+              commands:
+                - 'mute %target% 1h %context%'
+          - button:
+              text: '&c[Ban] '
+              hover: '&cBan %target% for 1 hour'
+              commands:
+                - 'ban %target% 1h %context%'
+          - button:
+              text: '&4[IP-Ban] '
+              hover: '&4IP-Ban %target% for 1 hour'
+              commands:
+                - 'banip %target% 1h %context%'
+          - text: ' (1 Hour)'
+      - text: ''
+      - line:
+          - button:
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 day'
+              commands:
+                - 'mute %target% 1d %context%'
+          - button:
+              text: '&c[Ban] '
+              hover: '&cBan %target% for 1 day'
+              commands:
+                - 'ban %target% 1d %context%'
+          - button:
+              text: '&4[IP-Ban] '
+              hover: '&4IP-Ban %target% for 1 day'
+              commands:
+                - 'banip %target% 1d %context%'
+          - text: ' (1 Day)'
+      - text: ''
+      - line:
+          - button:
+              text: '&6[Mute] '
+              hover: '&6Mute %target% for 1 week'
+              commands:
+                - 'mute %target% 1w %context%'
+          - button:
+              text: '&c[Ban] '
+              hover: '&cBan %target% for 1 week'
+              commands:
+                - 'ban %target% 1w %context%'
+          - button:
+              text: '&4[IP-Ban] '
+              hover: '&4IP-Ban %target% for 1 week'
+              commands:
+                - 'banip %target% 1w %context%'
+          - text: ' (1 Week)'
+      - text: ''
+      - line:
+          - button:
+              text: '&6[Mute] '
+              hover: '&6Mute %target% permanently'
+              commands:
+                - 'mute %target% %context%'
+          - button:
+              text: '&c[Ban] '
+              hover: '&cBan %target% permanently'
+              commands:
+                - 'ban %target% %context%'
+          - button:
+              text: '&4[IP-Ban] '
+              hover: '&4IP-Ban %target% permanently'
+              commands:
+                - 'banip %target% %context%'
+          - text: ' (Permanent)'
+      - text: ''
+      - line:
+          - button:
+              text: '&e[Info] '
+              hover: '&eView info on %target%'
+              commands:
+                - 'player:/whois %target%'
+          - button:
+              text: '&e[Banlist] '
+              hover: '&eView banlist'
+              commands:
+                - 'player:/banlist'
+          - button:
+              text: '&e[Un-Mute] '
+              hover: '&eUn-Mute %target%'
+              commands:
+                - 'mute %target%'
+          - button:
+              text: '&e[Un-Ban] '
+              hover: '&eUn-Ban %target%'
+              commands:
+                - 'pardon %target%'
+          - button:
+              text: '&e[Un-IP-Ban] '
+              hover: '&eUn-IP-Ban %target%'
+              commands:
+                - 'pardonip %target%'
+      - line:
+          - button:
+              text: '&e[Vanish & TP] '
+              hover: '&eVanish and teleport to %target%'
+              commands:
+                - 'v %player%'
+                - 'tp %player% %target%'
+          - button:
+              text: '&e[Check Alts] '
+              hover: '&eCheck alts of %target%'
+              commands:
+                - 'player:/alts %target%'
+          - button:
+              text: '&e[View Inventory] '
+              hover: '&eView inventory of %target%'
+              commands:
+                - 'player:/invsee %target%'
+          - button:
+              text: '&e[View Enderchest] '
+              hover: '&eView enderchest of %target%'
+              commands:
+                - 'player:/ec %target%'

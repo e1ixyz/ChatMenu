@@ -10,6 +10,7 @@
 # Placeholders:
 #   %player% -> the clicking player
 #   %target% -> the selected target (self menus fall back to %player%)
+#   %context% (alias: %reason%, %content%) -> extra text passed after the command (e.g. reason)
 
 commands:
 

@@ -52,6 +52,7 @@ public class CommandRunner implements CommandExecutor {
 
         final String viewerName = batch.viewerName;
         final String targetName = batch.targetName != null ? batch.targetName : batch.viewerName;
+        final String context = batch.context != null ? batch.context : "";
 
         for (int i = 0; i < batch.commands.size(); i++) {
             String seg = batch.commands.get(i);
@@ -60,7 +61,10 @@ public class CommandRunner implements CommandExecutor {
 
             String cmdFinal = plan.command()
                     .replace("%player%", viewerName)
-                    .replace("%target%", targetName);
+                    .replace("%target%", targetName)
+                    .replace("%context%", context)
+                    .replace("%reason%", context)
+                    .replace("%content%", context);
 
             if (cmdFinal.startsWith("/")) cmdFinal = cmdFinal.substring(1);
 
@@ -108,7 +112,7 @@ public class CommandRunner implements CommandExecutor {
                 Player targetPlayer = targetSnapshot == null ? null : Bukkit.getPlayerExact(targetSnapshot);
 
                 for (CommandConfig.Notification note : notifications) {
-                    Component msg = plugin.parseText(note.message, viewerSnapshot, targetSnapshot, note.context);
+                    Component msg = plugin.parseText(note.message, viewerSnapshot, targetSnapshot, context, note.context);
                     switch (note.audience) {
                         case VIEWER -> {
                             if (viewerSnapshot != null && viewerSnapshot.isOnline()) {
