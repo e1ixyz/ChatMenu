@@ -3,5 +3,5 @@
   "name": "ChatMenuProxy",
   "version": "1.0.0",
   "authors": ["ChatMenu"],
-  "main": "com.example.chatmenu.proxy.ChatMenuProxyPlugin"
+  "main": "io.github.e1ixyz.chatmenu.proxy.ChatMenuProxyPlugin"
 }

@@ -12,10 +12,10 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 - **Reload safe** – `/chatmenu reload` re-parses config, registers new commands, and retires old ones without a server restart.
 
 ## Requirements
-- Paper/Spigot 1.20+ (tested on 1.21)
+- Paper/Spigot 1.21.11+
 - Java 17+
 - Optional: [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) for `%placeholders%`
-- Optional: Velocity 3.3+ proxy (drop the same jar into the proxy’s `plugins/` folder to enable forwarding)
+- Optional: Velocity 3.4+ proxy (drop the same jar into the proxy’s `plugins/` folder to enable forwarding)
 
 ## Installation
 1. Drop the jar in `plugins/`.
@@ -23,6 +23,8 @@ Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated 
 3. Edit the config (single-quote strings to keep `&` and `[` intact).
 4. Use `/chatmenu reload` in game or console to apply changes.
 5. (Velocity only) Copy the same jar to your Velocity proxy’s `plugins/` folder and restart the proxy to enable proxy forwarding.
+
+Package namespace: `io.github.e1ixyz.chatmenu`.
 
 ## Configuration Overview
 

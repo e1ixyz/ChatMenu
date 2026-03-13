@@ -1,5 +1,5 @@
 name: ChatMenu
-main: com.example.chatmenu.ChatMenu
+main: io.github.e1ixyz.chatmenu.ChatMenu
 version: 2.0.0
 api-version: 1.21
 
