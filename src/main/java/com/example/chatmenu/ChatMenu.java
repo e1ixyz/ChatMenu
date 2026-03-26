@@ -1,4 +1,4 @@
-package io.github.e1ixyz.chatmenu;
+package com.example.chatmenu;
 
 import me.clip.placeholderapi.PlaceholderAPI;
 import net.kyori.adventure.text.Component;
@@ -52,10 +52,6 @@ public class ChatMenu extends JavaPlugin {
         if (getCommand("cmrun") != null) getCommand("cmrun").setExecutor(new CommandRunner());
         if (getCommand("chatmenu") != null) getCommand("chatmenu").setExecutor((sender, cmd, label, args) -> {
             if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-                if (!sender.hasPermission("chatmenu.admin")) {
-                    sender.sendMessage("§cYou don't have permission.");
-                    return true;
-                }
                 unregisterDynamicCommands();
                 reloadConfig();
                 loadCommands();
@@ -752,15 +748,7 @@ public class ChatMenu extends JavaPlugin {
 
     private boolean hasPermission(Player viewer, String permission) {
         if (permission == null || permission.isBlank()) return true;
-        String node = permission.trim();
-        boolean negated = false;
-        while (node.startsWith("!")) {
-            negated = !negated;
-            node = node.substring(1).trim();
-        }
-        if (node.isEmpty()) return true;
-        boolean hasPermission = viewer.hasPermission(node);
-        return negated ? !hasPermission : hasPermission;
+        return viewer.hasPermission(permission.trim());
     }
 
     private void sendChatMenu(Player viewer, String targetName, String context, CommandConfig cfg) {
@@ -887,7 +875,8 @@ public class ChatMenu extends JavaPlugin {
             pendingBatches.remove(token);
             return null;
         }
-        pendingBatches.remove(token);
+
+        batch.touch(now);
         return batch;
     }
 
@@ -917,8 +906,7 @@ public class ChatMenu extends JavaPlugin {
         if (raw == null || raw.isEmpty()) return Component.empty();
 
         String s = raw.replace("%player%", viewer.getName());
-        String resolvedTarget = (targetName == null || targetName.isBlank()) ? viewer.getName() : targetName;
-        s = s.replace("%target%", resolvedTarget);
+        if (targetName != null) s = s.replace("%target%", targetName);
 
         String ctxVal = context == null ? "" : context;
         s = s.replace("%context%", ctxVal)

@@ -1,1 +1,1 @@
-{"id":"chatmenuproxy","name":"ChatMenuProxy","version":"1.0.0","authors":["ChatMenu"],"dependencies":[],"main":"io.github.e1ixyz.chatmenu.proxy.ChatMenuProxyPlugin"}
+{"id":"chatmenuproxy","name":"ChatMenuProxy","version":"1.0.0","authors":["ChatMenu"],"dependencies":[],"main":"com.example.chatmenu.proxy.ChatMenuProxyPlugin"}

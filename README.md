@@ -78,7 +78,8 @@ Lines can be expressed in block or flow style, letting you keep dense inline men
 ```
 
 ### Conditional Content
-Add `permission:` to a message entry or button to only show it to players with that node:
+Add `permission:` to a message entry or button to only show it to players with that node.
+Prefix the node with `!` to hide that content from players who have it:
 
 ```yaml
   settings:
@@ -96,6 +97,13 @@ Add `permission:` to a message entry or button to only show it to players with t
               text: "&6[VIP Settings]"
               hover: "&6Settings for users with the VIP rank"
               commands: ["player:/vipsettings"]
+      - permission: "!chatmenu.staffsettings"
+        line:
+          - permission: chatmenu.vipsettings
+            button:
+              text: "&6[Silent Join/Quit]"
+              hover: "&6Shown to VIPs, but hidden once staff access applies"
+              commands: ["player:/silentjoin"]
 ```
 
 ### Context & Placeholders

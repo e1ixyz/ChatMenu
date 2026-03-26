@@ -361,6 +361,81 @@ commands:
               hover: '&aIgnore Player'
               commands:
                 - 'player:/ignore'
+          - button:
+              text: '&a[Claim Notifs] '
+              hover: '&aToggle getting notifications when you enter/exit claims'
+              commands:
+                - 'player:/claimalerts'
+          - button:
+              text: '&a[Fix Guns] '
+              hover: '&aClick this if your guns are broken/not loading'
+              commands:
+                - 'player:/qa sendResourcepack'
+          - button:
+              text: '&a[Toggle Leaderboard] '
+              hover: '&aClick to toggle to leaderboard scoreboard'
+              commands:
+                - 'player:/lb toggle'
+      - permission: '!chatmenu.staffsettings'
+        line:
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[View VIP Perks] '
+              hover: '&6Open VIP perks/commands list'
+              commands:
+                - 'player:/vip'
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[Silent Join/Quit] '
+              hover: '&6Open silent join selection menu'
+              commands:
+                - 'player:/silentjoin'
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[VIP Prefix] '
+              hover: '&6Open VIP Prefix selection menu'
+              commands:
+                - 'player:/vipprefix'
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[Silent Claims] '
+              hover: '&6Toggle silent visiting'
+              commands:
+                - 'player:/silentvisit'
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[Toggle Messages] '
+              hover: '&6Enabled/disable receiving private messages'
+              commands:
+                - 'player:/msgtoggle'
+          - permission: chatmenu.vipsettings
+            button:
+              text: '&6[Auto TP Accept] '
+              hover: '&6Enable/disable automatically accepting tp requests'
+              commands:
+                - 'player:/tptoggle'
+      - permission: chatmenu.staffsettings
+        line:
+          - button:
+              text: '&c[View Staff Commands] '
+              hover: '&cOpen Staff commands list'
+              commands:
+                - 'player:/staff'
+          - button:
+              text: '&c[Silent Join/Quit] '
+              hover: '&cOpen silent join selection menu'
+              commands:
+                - 'player:/silentjoin'
+          - button:
+              text: '&c[Silent Claims] '
+              hover: '&cToggle silent visiting'
+              commands:
+                - 'player:/silentvisit'
+          - button:
+              text: '&c[Toggle Messages] '
+              hover: '&cEnabled/disable receiving private messages'
+              commands:
+                - 'player:/msgtoggle'
 
   discordsettings:
     permission: chatmenu.discordsettings
