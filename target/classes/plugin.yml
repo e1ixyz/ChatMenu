@@ -1,12 +1,12 @@
 name: ChatMenu
 main: io.github.e1ixyz.chatmenu.ChatMenu
-version: 2.0.0
+version: 2.1.0
 api-version: 1.21
 
 commands:
   chatmenu:
     description: ChatMenu admin commands
-    usage: /chatmenu reload
+    usage: /chatmenu <reload|gui on|off>
     permission: chatmenu.admin
   cmrun:
     description: Internal command runner (used by ChatMenu clickable items)

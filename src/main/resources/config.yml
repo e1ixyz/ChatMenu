@@ -9,10 +9,23 @@
 #   context     -> viewer | target   (PlaceholderAPI render context)
 #   append-space -> add a trailing space after the button (default false)
 #   permission  -> optional node required to show this entry; prefix with ! to hide from that node
+#   icon        -> (GUI mode) material for this button's item, e.g. DIAMOND_SWORD (default: gui.default-icon)
 # Placeholders:
 #   %player% -> viewer name
 #   %target% -> selected target (self menus fall back to the viewer)
 #   %context% (alias: %reason%, %content%) -> extra text passed after the command (e.g. reason)
+
+# GUI (chest-menu) mode. Toggle live in-game with: /chatmenu gui <on|off>
+# When enabled, every menu opens as a chest GUI instead of chat. Rows/pages size to the
+# number of options; buttons become items (text -> name, hover -> lore). Non-clickable
+# slots are filled with the configured pane. Target menus that use %context% but were
+# opened without a reason prompt the clicker to type one in chat.
+gui:
+  enabled: false                              # master toggle (also flipped by /chatmenu gui on|off)
+  filler: GRAY_STAINED_GLASS_PANE             # dark gray panes fill empty/non-clickable slots
+  default-icon: PAPER                         # item used for buttons without their own icon:
+  label-icon: LIGHT_GRAY_STAINED_GLASS_PANE   # item used for label/header slots
+  title: "&8%menu%"                           # inventory title; %menu% -> command name
 
 commands:
 
@@ -26,6 +39,7 @@ commands:
           - button:
               text: "&2Dark Green"
               hover: "&aSelect Dark Green"
+              icon: GREEN_WOOL            # GUI mode: per-button item (others fall back to gui.default-icon)
               commands:
                 - "lp user %player% meta removeprefix 2"
                 - "lp user %player% meta addprefix 2 &2"
@@ -140,6 +154,7 @@ commands:
           - button:
               text: "&cReset Color and Prefix"
               hover: "&cRemove all selections"
+              icon: BARRIER
               commands:
                 - "lp user %player% meta removeprefix 2"
                 - "lp user %player% meta removeprefix 3"

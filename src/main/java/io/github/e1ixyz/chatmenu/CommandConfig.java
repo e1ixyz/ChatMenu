@@ -112,18 +112,26 @@ public class CommandConfig {
         public final boolean appendSpace;
         public final List<Notification> notifications;
         public final String permission;
+        public final String icon; // optional material name for GUI mode ("" = use default)
         private final PapiContext context;
 
         public ButtonSegment(String display, String hover, List<String> commands,
                              CommandExecutor defaultExecutor, boolean appendSpace,
                              List<Notification> notifications, PapiContext context) {
-            this(display, hover, commands, defaultExecutor, appendSpace, notifications, context, "");
+            this(display, hover, commands, defaultExecutor, appendSpace, notifications, context, "", "");
         }
 
         public ButtonSegment(String display, String hover, List<String> commands,
                              CommandExecutor defaultExecutor, boolean appendSpace,
                              List<Notification> notifications, PapiContext context,
                              String permission) {
+            this(display, hover, commands, defaultExecutor, appendSpace, notifications, context, permission, "");
+        }
+
+        public ButtonSegment(String display, String hover, List<String> commands,
+                             CommandExecutor defaultExecutor, boolean appendSpace,
+                             List<Notification> notifications, PapiContext context,
+                             String permission, String icon) {
             this.display = display == null ? "" : display;
             this.hover = hover == null ? "" : hover;
             this.commands = commands == null ? List.of() : List.copyOf(commands);
@@ -136,6 +144,7 @@ public class CommandConfig {
             this.notifications = notifications == null ? List.of() : List.copyOf(notifications);
             this.context = context == null ? PapiContext.VIEWER : context;
             this.permission = permission == null ? "" : permission.trim();
+            this.icon = icon == null ? "" : icon.trim();
         }
 
         @Override

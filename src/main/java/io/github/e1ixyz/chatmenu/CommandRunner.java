@@ -50,6 +50,16 @@ public class CommandRunner implements CommandExecutor {
             return true;
         }
 
+        executeBatch(plugin, viewer, batch);
+        return true;
+    }
+
+    /**
+     * Runs a resolved batch of commands + notifications for the given viewer.
+     * Shared by chat-menu token clicks ({@code /cmrun}) and inventory-GUI clicks,
+     * so both paths behave identically.
+     */
+    static void executeBatch(ChatMenu plugin, Player viewer, PendingBatch batch) {
         final String viewerName = batch.viewerName;
         final String targetName = batch.targetName != null ? batch.targetName : batch.viewerName;
         final String context = batch.context != null ? batch.context : "";
@@ -132,8 +142,6 @@ public class CommandRunner implements CommandExecutor {
                 }
             }, notifyDelay);
         }
-
-        return true;
     }
 
     private record ExecutionPlan(String command, boolean proxy, boolean runAsPlayer,

@@ -3,6 +3,7 @@
 Clickable chat menus from config for Paper/Spigot. Build fast, permission-gated chat UIs that run commands on click—no inventory GUIs or manual `plugin.yml` entries for every shortcut.
 
 ## Features
+- **Chat *or* chest-GUI** – flip every menu to a chest GUI live with `/chatmenu gui on`, no config rewrite. Rows and pages size themselves to the number of options; over 6 rows it paginates automatically.
 - **Dynamic commands** – every child under `commands:` becomes `/yourcommand` at runtime, with optional self/target modes and tab-complete for target menus.
 - **Structured YAML menus** – compose lines from `text` and `button` segments so large inline menus stay readable. Legacy bracket syntax (`[display|commands|hover]`) still works for existing configs.
 - **Inline notifications** – add `notify.viewer` / `notify.target` to a button to send feedback without padding the config with `/tellraw`.
@@ -112,6 +113,27 @@ Prefix the node with `!` to hide that content from players who have it:
 - Set `context: target` on a line or segment to render PlaceholderAPI text/hover with the target player.
 - Opening text with `{{ctx=target}}` still works for legacy strings.
 
+### GUI (Chest-Menu) Mode
+Toggle it live with `/chatmenu gui on` / `off` (persisted to config; also settable via `gui.enabled`). When on, every menu opens as a chest GUI instead of chat — the same config drives both.
+
+```yaml
+gui:
+  enabled: false                              # master toggle (also flipped by /chatmenu gui on|off)
+  filler: GRAY_STAINED_GLASS_PANE             # dark gray panes fill empty/non-clickable slots
+  default-icon: PAPER                         # item used for buttons without their own icon:
+  label-icon: LIGHT_GRAY_STAINED_GLASS_PANE   # item used for label/header slots
+  title: "&8%menu%"                           # inventory title; %menu% -> command name
+```
+
+How a config translates to a GUI:
+- **Each menu line becomes a row group.** Buttons become items (`text` → item name, `hover` → lore, colors preserved). Text that leads or trails a line's buttons becomes a **label item** in front of that group; inter-button separators (like `", "`) are dropped. A text-only line becomes a header label.
+- **Per-button items** – set `icon: MATERIAL` on any button (e.g. `icon: DIAMOND_SWORD`). Unset buttons use `gui.default-icon`. Change icons and run `/chatmenu reload` to hot-swap them on a live server.
+- **Dynamic sizing** – rows = however many the options need. Menus over 6 rows paginate with `«`/`»` and a close button on the bottom row. (Items themselves are fixed 16×16 slots — Minecraft can't resize an item; the *grid* is what grows and shrinks.)
+- **Non-clickable slots** – filled with `gui.filler` (dark gray panes by default). Filler and label slots ignore clicks; the menu is read-only, so items can't be taken.
+- **Reason prompts** – a `type: target` menu opened without a reason (`/punish Steve` rather than `/punish Steve griefing`) will, when you click a button whose command uses `%context%`, close the GUI and ask you to type the reason in chat (`cancel` aborts, 60s timeout). If the reason was already passed on the command, it's used directly and no prompt appears.
+
+Everything else — permissions, `%player%`/`%target%`/`%context%`, PlaceholderAPI context, `run-as`, proxy commands, notifications — behaves identically to chat mode.
+
 ### Legacy Bracket Syntax
 Existing configs using `[Display | command1; command2 | Hover | flags]` continue to load. Flags support `as=player` and `ctx=viewer|target`. You can mix legacy strings with the new structure per line during migration.
 
@@ -130,7 +152,8 @@ The default `config.yml` ships with:
 Both illustrate inline lists without unreadable escape soup.
 
 ## Commands
-- `/chatmenu reload` – reload config, rebuild dynamic commands.
+- `/chatmenu reload` – reload config, rebuild dynamic commands, re-read GUI settings/icons.
+- `/chatmenu gui <on|off>` – toggle chest-GUI mode for all menus (persisted to config).
 - `/<name>` – one per `commands.<name>` entry.
 - `/cmrun <token>` – internal command used by menu clicks; now locked to generated tokens (no permission required).
 

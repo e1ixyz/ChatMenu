@@ -7,6 +7,7 @@ import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandMap;
@@ -37,6 +38,14 @@ public class ChatMenu extends JavaPlugin {
     private static final long PENDING_TTL_MS = 5 * 60_000L;
     private ProxyCommandBridge proxyBridge;
 
+    // GUI (chest-menu) mode settings — re-read on /chatmenu reload
+    private boolean guiEnabled;
+    private Material guiFiller;
+    private Material guiDefaultIcon;
+    private Material guiLabelIcon;
+    private String guiTitle;
+    private GuiManager guiManager;
+
     public static ChatMenu getInstance() {
         return instance;
     }
@@ -46,8 +55,12 @@ public class ChatMenu extends JavaPlugin {
         instance = this;
         saveDefaultConfig();
         loadCommands();
+        loadGuiSettings();
         proxyBridge = new ProxyCommandBridge(this);
         proxyBridge.register();
+
+        guiManager = new GuiManager(this);
+        getServer().getPluginManager().registerEvents(guiManager, this);
 
         if (getCommand("cmrun") != null) getCommand("cmrun").setExecutor(new CommandRunner());
         if (getCommand("chatmenu") != null) getCommand("chatmenu").setExecutor((sender, cmd, label, args) -> {
@@ -59,22 +72,43 @@ public class ChatMenu extends JavaPlugin {
                 unregisterDynamicCommands();
                 reloadConfig();
                 loadCommands();
+                loadGuiSettings();
                 registerDynamicCommands();
-                sender.sendMessage("§aChatMenu config reloaded.");
+                sender.sendMessage("§aChatMenu config reloaded. GUI mode: " + (guiEnabled ? "§aon" : "§7off"));
                 return true;
             }
-            sender.sendMessage("§eUsage: /chatmenu reload");
+            if (args.length > 0 && args[0].equalsIgnoreCase("gui")) {
+                if (!sender.hasPermission("chatmenu.admin")) {
+                    sender.sendMessage("§cYou don't have permission.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage("§eGUI mode is currently " + (guiEnabled ? "§aon" : "§7off") + "§e. Usage: /chatmenu gui <on|off>");
+                    return true;
+                }
+                boolean enable = args[1].equalsIgnoreCase("on") || args[1].equalsIgnoreCase("true");
+                guiEnabled = enable;
+                getConfig().set("gui.enabled", enable);
+                saveConfig();
+                sender.sendMessage("§aChatMenu GUI mode " + (enable ? "§aenabled" : "§7disabled") + "§a. All menus now open as " + (enable ? "chest GUIs." : "chat menus."));
+                return true;
+            }
+            sender.sendMessage("§eUsage: /chatmenu <reload|gui on|off>");
             return true;
         });
 
         registerDynamicCommands();
-        getLogger().info("ChatMenu enabled.");
+        getLogger().info("ChatMenu enabled. GUI mode: " + (guiEnabled ? "on" : "off"));
     }
 
     @Override
     public void onDisable() {
         unregisterDynamicCommands();
         pendingBatches.clear();
+        if (guiManager != null) {
+            guiManager.shutdown();
+            guiManager = null;
+        }
         if (proxyBridge != null) {
             proxyBridge.unregister();
             proxyBridge = null;
@@ -102,6 +136,60 @@ public class ChatMenu extends JavaPlugin {
             CommandConfig cfg = new CommandConfig(key.toLowerCase(), permission, type, lines);
             commands.put(cfg.name, cfg);
         }
+    }
+
+    /* ----------------------------- GUI mode ----------------------------- */
+
+    private void loadGuiSettings() {
+        var sec = getConfig().getConfigurationSection("gui");
+        guiEnabled = sec != null && sec.getBoolean("enabled", false);
+        guiFiller = resolveMaterial(sec == null ? null : sec.getString("filler"), Material.GRAY_STAINED_GLASS_PANE);
+        guiDefaultIcon = resolveMaterial(sec == null ? null : sec.getString("default-icon"), Material.PAPER);
+        guiLabelIcon = resolveMaterial(sec == null ? null : sec.getString("label-icon"), Material.LIGHT_GRAY_STAINED_GLASS_PANE);
+        guiTitle = sec == null ? "&8%menu%" : sec.getString("title", "&8%menu%");
+    }
+
+    Material resolveMaterial(String name, Material fallback) {
+        if (name == null || name.isBlank()) return fallback;
+        Material m = Material.matchMaterial(name.trim().toUpperCase(Locale.ROOT));
+        if (m == null || !m.isItem()) {
+            getLogger().warning("ChatMenu GUI: unknown/invalid material '" + name + "', using " + fallback + ".");
+            return fallback;
+        }
+        return m;
+    }
+
+    boolean isGuiEnabled() { return guiEnabled; }
+    Material guiFiller() { return guiFiller; }
+    Material guiDefaultIcon() { return guiDefaultIcon; }
+    Material guiLabelIcon() { return guiLabelIcon; }
+    String guiTitleTemplate() { return guiTitle; }
+    MiniMessage miniMessage() { return mm; }
+
+    /** True if any of the button's commands substitute the reason/context token. */
+    boolean buttonNeedsContext(CommandConfig.ButtonSegment button) {
+        for (String c : button.commands) {
+            if (c == null) continue;
+            String lc = c.toLowerCase(Locale.ROOT);
+            if (lc.contains("%context%") || lc.contains("%reason%") || lc.contains("%content%")) return true;
+        }
+        return false;
+    }
+
+    /** Execute a single GUI button for the viewer, resolving target the same way chat menus do. */
+    void runButton(Player viewer, CommandConfig cfg, String targetName, String context, CommandConfig.ButtonSegment button) {
+        if (!hasPermission(viewer, button.permission())) return;
+        List<String> encoded = encodeCommands(button);
+        if (encoded.isEmpty() && button.notifications.isEmpty()) return;
+
+        String viewerName = viewer.getName();
+        String targetResolved = (cfg.type == CommandType.TARGET)
+                ? (targetName == null ? viewerName : targetName)
+                : viewerName;
+
+        PendingBatch batch = new PendingBatch(viewerName, targetResolved, context == null ? "" : context,
+                encoded, button.notifications);
+        CommandRunner.executeBatch(this, viewer, batch);
     }
 
     private List<CommandConfig.Line> parseMessageDefinition(Object rawMessage, CommandType type) {
@@ -272,7 +360,10 @@ public class ChatMenu extends JavaPlugin {
         String permission = parsePermission(buttonSource.get("permission"));
         if (permission.isEmpty()) permission = inheritedPermission == null ? "" : inheritedPermission;
 
-        return new CommandConfig.ButtonSegment(display, hover, commands, defaultExecutor, appendSpace, notifications, ctx, permission);
+        String icon = firstNonNull(buttonSource.get("icon"), buttonSource.get("material"),
+                buttonSource.get("item"), container.get("icon"));
+
+        return new CommandConfig.ButtonSegment(display, hover, commands, defaultExecutor, appendSpace, notifications, ctx, permission, icon);
     }
 
     private boolean looksLikeButton(Map<String, Object> map) {
@@ -524,7 +615,7 @@ public class ChatMenu extends JavaPlugin {
         return new CommandConfig.Line(segments, permission);
     }
 
-    private List<String> encodeCommands(CommandConfig.ButtonSegment button) {
+    List<String> encodeCommands(CommandConfig.ButtonSegment button) {
         if (button.commands.isEmpty()) return List.of();
         List<String> encoded = new ArrayList<>(button.commands.size());
         CommandConfig.CommandExecutor defaultExecutor = button.defaultExecutor;
@@ -669,7 +760,7 @@ public class ChatMenu extends JavaPlugin {
         String context = args.length > 0 ? joinArgs(args, cfg.type == CommandType.TARGET ? 1 : 0) : "";
 
         if (cfg.type == CommandType.SELF) {
-            sendChatMenu(viewer, null, context, cfg);
+            openMenu(viewer, null, context, cfg);
             return true;
         }
 
@@ -680,8 +771,17 @@ public class ChatMenu extends JavaPlugin {
         }
 
         String targetName = args[0];
-        sendChatMenu(viewer, targetName, context, cfg);
+        openMenu(viewer, targetName, context, cfg);
         return true;
+    }
+
+    /** Route a menu to the chest GUI or to chat depending on the current toggle. */
+    private void openMenu(Player viewer, String targetName, String context, CommandConfig cfg) {
+        if (guiEnabled && guiManager != null) {
+            guiManager.open(viewer, cfg, targetName, context, 0);
+        } else {
+            sendChatMenu(viewer, targetName, context, cfg);
+        }
     }
 
     private String joinArgs(String[] args, int startIndex) {
@@ -750,7 +850,7 @@ public class ChatMenu extends JavaPlugin {
         return new LineCtx(s, ctx);
     }
 
-    private boolean hasPermission(Player viewer, String permission) {
+    boolean hasPermission(Player viewer, String permission) {
         if (permission == null || permission.isBlank()) return true;
         String node = permission.trim();
         boolean negated = false;
