@@ -85,8 +85,10 @@ public class GuiManager implements Listener {
 
         for (int r = 0; r < pageRows.size(); r++) {
             List<Cell> row = pageRows.get(r);
-            for (int c = 0; c < row.size() && c < COLS; c++) {
-                int slot = r * COLS + c;
+            int n = Math.min(row.size(), COLS);
+            int startCol = (COLS - n) / 2; // center the row's items
+            for (int c = 0; c < n; c++) {
+                int slot = r * COLS + startCol + c;
                 Cell cell = row.get(c);
                 inv.setItem(slot, cell.item());
                 if (cell.button() != null) holder.buttons.put(slot, cell.button());
@@ -258,8 +260,13 @@ public class GuiManager implements Listener {
 
         String ctx = holder.context;
         if ((ctx == null || ctx.isBlank()) && plugin.buttonNeedsContext(btn)) {
-            startPrompt(p, holder, btn);
+            startPrompt(p, holder, btn); // startPrompt closes the inventory itself
             return;
+        }
+        // Close the menu on click, unless this button opens another ChatMenu menu
+        // (that sub-menu will replace the inventory on the next tick).
+        if (!plugin.buttonOpensMenu(btn)) {
+            p.closeInventory();
         }
         plugin.runButton(p, holder.cfg, holder.targetName, ctx, btn);
     }

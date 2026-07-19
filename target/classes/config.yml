@@ -23,8 +23,8 @@
 gui:
   enabled: false                              # master toggle (also flipped by /chatmenu gui on|off)
   filler: GRAY_STAINED_GLASS_PANE             # dark gray panes fill empty/non-clickable slots
-  default-icon: PAPER                         # item used for buttons without their own icon:
-  label-icon: LIGHT_GRAY_STAINED_GLASS_PANE   # item used for label/header slots
+  default-icon: PAPER                         # item used for settings/buttons without their own icon:
+  label-icon: BOOK                            # item used for label/header slots
   title: "&8%menu%"                           # inventory title; %menu% -> command name
 
 commands:

@@ -145,7 +145,7 @@ public class ChatMenu extends JavaPlugin {
         guiEnabled = sec != null && sec.getBoolean("enabled", false);
         guiFiller = resolveMaterial(sec == null ? null : sec.getString("filler"), Material.GRAY_STAINED_GLASS_PANE);
         guiDefaultIcon = resolveMaterial(sec == null ? null : sec.getString("default-icon"), Material.PAPER);
-        guiLabelIcon = resolveMaterial(sec == null ? null : sec.getString("label-icon"), Material.LIGHT_GRAY_STAINED_GLASS_PANE);
+        guiLabelIcon = resolveMaterial(sec == null ? null : sec.getString("label-icon"), Material.BOOK);
         guiTitle = sec == null ? "&8%menu%" : sec.getString("title", "&8%menu%");
     }
 
@@ -165,6 +165,34 @@ public class ChatMenu extends JavaPlugin {
     Material guiLabelIcon() { return guiLabelIcon; }
     String guiTitleTemplate() { return guiTitle; }
     MiniMessage miniMessage() { return mm; }
+
+    /** True if any of the button's commands opens another registered ChatMenu menu (navigation). */
+    boolean buttonOpensMenu(CommandConfig.ButtonSegment button) {
+        for (String raw : button.commands) {
+            String base = stripToBaseCommand(raw);
+            if (base != null && commands.containsKey(base)) return true;
+        }
+        return false;
+    }
+
+    /** Reduce a configured command to its bare command name (strip executor prefix, slash, args). */
+    private String stripToBaseCommand(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        String[] prefixes = {"proxy-console:", "proxy_console:", "proxyconsole:",
+                "proxy-player:", "proxy_player:", "proxyplayer:", "proxy:", "player:", "console:"};
+        boolean changed = true;
+        while (changed) {
+            changed = false;
+            for (String p : prefixes) {
+                if (startsWithIgnoreCase(s, p)) { s = s.substring(p.length()).trim(); changed = true; break; }
+            }
+        }
+        if (s.startsWith("/")) s = s.substring(1).trim();
+        if (s.isEmpty()) return null;
+        int sp = s.indexOf(' ');
+        return (sp < 0 ? s : s.substring(0, sp)).toLowerCase(Locale.ROOT);
+    }
 
     /** True if any of the button's commands substitute the reason/context token. */
     boolean buttonNeedsContext(CommandConfig.ButtonSegment button) {

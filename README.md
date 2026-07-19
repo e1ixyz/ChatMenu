@@ -120,8 +120,8 @@ Toggle it live with `/chatmenu gui on` / `off` (persisted to config; also settab
 gui:
   enabled: false                              # master toggle (also flipped by /chatmenu gui on|off)
   filler: GRAY_STAINED_GLASS_PANE             # dark gray panes fill empty/non-clickable slots
-  default-icon: PAPER                         # item used for buttons without their own icon:
-  label-icon: LIGHT_GRAY_STAINED_GLASS_PANE   # item used for label/header slots
+  default-icon: PAPER                         # item used for settings/buttons without their own icon:
+  label-icon: BOOK                            # item used for label/header slots
   title: "&8%menu%"                           # inventory title; %menu% -> command name
 ```
 
@@ -129,7 +129,8 @@ How a config translates to a GUI:
 - **Each menu line becomes a row group.** Buttons become items (`text` → item name, `hover` → lore, colors preserved). Text that leads or trails a line's buttons becomes a **label item** in front of that group; inter-button separators (like `", "`) are dropped. A text-only line becomes a header label.
 - **Per-button items** – set `icon: MATERIAL` on any button (e.g. `icon: DIAMOND_SWORD`). Unset buttons use `gui.default-icon`. Change icons and run `/chatmenu reload` to hot-swap them on a live server.
 - **Dynamic sizing** – rows = however many the options need. Menus over 6 rows paginate with `«`/`»` and a close button on the bottom row. (Items themselves are fixed 16×16 slots — Minecraft can't resize an item; the *grid* is what grows and shrinks.)
-- **Non-clickable slots** – filled with `gui.filler` (dark gray panes by default). Filler and label slots ignore clicks; the menu is read-only, so items can't be taken.
+- **Non-clickable slots** – filled with `gui.filler` (dark gray panes by default). Filler and label slots ignore clicks; the menu is read-only, so items can't be taken. Each row's items are centered.
+- **Clicking closes the menu**, unless the button runs another ChatMenu command (navigation) — then that sub-menu opens in place. Use `label-icon` (a book by default) for headers and `default-icon` (paper) for the actual settings.
 - **Reason prompts** – a `type: target` menu opened without a reason (`/punish Steve` rather than `/punish Steve griefing`) will, when you click a button whose command uses `%context%`, close the GUI and ask you to type the reason in chat (`cancel` aborts, 60s timeout). If the reason was already passed on the command, it's used directly and no prompt appears.
 
 Everything else — permissions, `%player%`/`%target%`/`%context%`, PlaceholderAPI context, `run-as`, proxy commands, notifications — behaves identically to chat mode.
